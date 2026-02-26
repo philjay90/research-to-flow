@@ -61,7 +61,15 @@ export default async function ProjectPage({
         <a href="/" className="text-sm text-indigo-600 hover:underline">
           ← All Projects
         </a>
-        <h1 className="mt-2 text-2xl font-bold">{(project as Project).name}</h1>
+        <div className="mt-2 flex items-center justify-between gap-4">
+          <h1 className="text-2xl font-bold">{(project as Project).name}</h1>
+          <a
+            href={`/projects/${id}/flow`}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            View Flow →
+          </a>
+        </div>
         {project.description && (
           <p className="mt-1 text-gray-600">{project.description}</p>
         )}

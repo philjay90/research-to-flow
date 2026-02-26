@@ -24,6 +24,27 @@ export interface ResearchInput {
   updated_at: string
 }
 
+export interface FlowNode {
+  id: string
+  project_id: string
+  requirement_id: string | null
+  type: string
+  label: string
+  position_x: number
+  position_y: number
+  created_at: string
+  updated_at: string
+}
+
+export interface FlowEdge {
+  id: string
+  project_id: string
+  source_node_id: string
+  target_node_id: string
+  label: string | null
+  created_at: string
+}
+
 export type DFVTag = 'desirability' | 'feasibility' | 'viability'
 export type RequirementStatus = 'active' | 'draft' | 'stale' | 'unanchored'
 
