@@ -19,6 +19,23 @@ export interface ResearchInput {
   type: ResearchInputType
   content: string
   source_label: string | null
+  attachment_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DFVTag = 'desirability' | 'feasibility' | 'viability'
+export type RequirementStatus = 'active' | 'draft' | 'stale' | 'unanchored'
+
+export interface Requirement {
+  id: string
+  project_id: string
+  source_input_ids: string[]
+  business_opportunity: string
+  user_story: string
+  acceptance_criteria: string[]
+  dfv_tag: DFVTag | null
+  status: RequirementStatus
   created_at: string
   updated_at: string
 }
