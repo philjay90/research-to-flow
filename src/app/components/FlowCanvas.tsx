@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useRef, useState, useTransition } from 'react'
+import React, { useCallback, useRef, useState, useTransition } from 'react'
 import {
   ReactFlow,
   Background,
@@ -93,7 +93,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
   const [generateError, setGenerateError] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const onNodeDragStop = useCallback((_event: MouseEvent, node: Node) => {
+  const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       saveNodePosition(node.id, node.position.x, node.position.y)
