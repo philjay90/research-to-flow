@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import FlowCanvas from '@/app/components/FlowCanvas'
@@ -25,20 +26,20 @@ export default async function FlowPage({
   ])
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-white">
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header bar */}
-      <header className="flex items-center justify-between border-b bg-white px-6 py-3">
-        <div className="flex items-center gap-4">
-          <a
+      <header className="flex items-center justify-between bg-[#19323C] px-6 py-3">
+        <div className="flex items-center gap-3">
+          <Link
             href={`/projects/${id}`}
-            className="text-sm text-indigo-600 hover:underline"
+            className="text-sm text-white/80 hover:text-white transition-colors"
           >
             ← {(project as Project).name}
-          </a>
-          <span className="text-sm text-gray-400">/</span>
-          <span className="text-sm font-medium text-gray-700">Flow</span>
+          </Link>
+          <span className="text-sm text-white/30">/</span>
+          <span className="text-sm font-medium text-white">Flow</span>
         </div>
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-white/50">
           Drag nodes · Connect handles · Delete edges with Backspace
         </span>
       </header>

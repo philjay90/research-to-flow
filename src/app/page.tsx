@@ -1,6 +1,8 @@
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { Project } from '@/types'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 
 export default async function HomePage() {
   const { data: projects, error } = await supabase
@@ -14,33 +16,39 @@ export default async function HomePage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Projects</h1>
-        <Link
-          href="/projects/new"
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          New Project
-        </Link>
+      <div className="mb-8 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Projects</h1>
+          <p className="mt-1 text-sm text-[#7286A0]">Your UX research workspaces</p>
+        </div>
+        <Button asChild className="bg-[#EE4266] text-white hover:bg-[#d63558]">
+          <Link href="/projects/new">New Project</Link>
+        </Button>
       </div>
 
       {!projects || projects.length === 0 ? (
-        <p className="text-gray-500">No projects yet. Create one to get started.</p>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+            <p className="text-[#7286A0]">No projects yet.</p>
+            <p className="mt-1 text-sm text-[#7286A0]">Create one to get started.</p>
+          </CardContent>
+        </Card>
       ) : (
         <ul className="space-y-3">
           {(projects as Project[]).map((project) => (
             <li key={project.id}>
-              <Link
-                href={`/projects/${project.id}`}
-                className="block rounded-lg border bg-white p-4 hover:border-indigo-300 hover:shadow-sm"
-              >
-                <p className="font-semibold">{project.name}</p>
-                {project.description && (
-                  <p className="mt-1 text-sm text-gray-500">{project.description}</p>
-                )}
-                <p className="mt-2 text-xs text-gray-400">
-                  Created {new Date(project.created_at).toLocaleDateString()}
-                </p>
+              <Link href={`/projects/${project.id}`}>
+                <Card className="cursor-pointer transition-shadow hover:shadow-md hover:border-[#EE4266]/40">
+                  <CardContent className="p-4">
+                    <p className="font-semibold text-foreground">{project.name}</p>
+                    {project.description && (
+                      <p className="mt-1 text-sm text-[#7286A0]">{project.description}</p>
+                    )}
+                    <p className="mt-2 text-xs text-[#7286A0]/70">
+                      Created {new Date(project.created_at).toLocaleDateString()}
+                    </p>
+                  </CardContent>
+                </Card>
               </Link>
             </li>
           ))}

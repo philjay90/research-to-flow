@@ -13,9 +13,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-gray-50 text-gray-900 antialiased">
-        <header className="border-b bg-white px-6 py-4">
-          <a href="/" className="text-lg font-semibold text-indigo-600">
+      <body className="min-h-screen bg-background text-foreground antialiased">
+        <header className="bg-[#19323C] px-6 py-4">
+          <a href="/" className="text-lg font-semibold text-white tracking-tight">
             Research-to-Flow
           </a>
         </header>

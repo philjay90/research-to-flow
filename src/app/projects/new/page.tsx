@@ -1,53 +1,61 @@
+import Link from 'next/link'
 import { createProject } from '@/app/actions'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
 
 export default function NewProjectPage() {
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-bold">New Project</h1>
+    <div className="mx-auto max-w-lg">
+      <h1 className="mb-6 text-2xl font-bold text-foreground">New Project</h1>
 
-      <form action={createProject} className="space-y-4">
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Project Name <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="name"
-            name="name"
-            type="text"
-            required
-            placeholder="e.g. Checkout Redesign"
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-        </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base text-[#7286A0]">
+            Start by giving your project a name and context
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form action={createProject} className="space-y-5">
+            <div className="space-y-1.5">
+              <Label htmlFor="name">
+                Project Name <span className="text-[#EE4266]">*</span>
+              </Label>
+              <Input
+                id="name"
+                name="name"
+                type="text"
+                required
+                placeholder="e.g. Checkout Redesign"
+              />
+            </div>
 
-        <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700">
-            Description
-          </label>
-          <textarea
-            id="description"
-            name="description"
-            rows={3}
-            placeholder="Optional context about this project..."
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-          />
-        </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="description">Description</Label>
+              <Textarea
+                id="description"
+                name="description"
+                rows={3}
+                placeholder="Optional context about this project..."
+              />
+            </div>
 
-        <div className="flex gap-3">
-          <button
-            type="submit"
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-          >
-            Create Project
-          </button>
-          <a
-            href="/"
-            className="rounded-md border px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50"
-          >
-            Cancel
-          </a>
-        </div>
-      </form>
+            <div className="flex gap-3 pt-1">
+              <Button
+                type="submit"
+                className="bg-[#EE4266] text-white hover:bg-[#d63558]"
+              >
+                Create Project
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/">Cancel</Link>
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   )
 }

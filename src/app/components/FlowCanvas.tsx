@@ -20,6 +20,11 @@ import '@xyflow/react/dist/style.css'
 import { saveNodePosition, saveEdge, deleteEdge, generateFlow } from '@/app/actions'
 import type { FlowNode, FlowEdge, Requirement } from '@/types'
 
+// Brand palette constants
+const EDGE_COLOR = '#19323C'   // Jet Black for arrows
+const STEP_COLOR = '#19323C'   // Jet Black border for step nodes
+const DECISION_COLOR = '#CBA328' // Golden Bronze for decision nodes
+
 interface Props {
   projectId: string
   initialNodes: FlowNode[]
@@ -42,26 +47,26 @@ function toRFEdges(edges: FlowEdge[]): Edge[] {
     source: e.source_node_id,
     target: e.target_node_id,
     label: e.label ?? undefined,
-    labelStyle: { fontSize: 11, fontWeight: 600, fill: '#4b5563' },
-    labelBgStyle: { fill: '#f9fafb', fillOpacity: 0.9 },
+    labelStyle: { fontSize: 11, fontWeight: 600, fill: '#19323C' },
+    labelBgStyle: { fill: '#F3F7F0', fillOpacity: 0.95 },
     labelBgPadding: [4, 6] as [number, number],
     labelBgBorderRadius: 4,
-    markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
-    style: { stroke: '#6366f1', strokeWidth: 2 },
+    markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
+    style: { stroke: EDGE_COLOR, strokeWidth: 2 },
   }))
 }
 
 // Rounded rectangle — for linear task steps
 function StepNode({ data }: { data: Record<string, unknown> }) {
   return (
-    <div className="w-52 rounded-xl border-2 border-indigo-400 bg-white shadow-sm">
-      <Handle type="target" position={Position.Top} className="!bg-indigo-400 !border-white" />
-      <Handle type="target" id="left-in" position={Position.Left} className="!bg-indigo-400 !border-white" />
+    <div className="w-52 rounded-xl border-2 bg-white shadow-sm" style={{ borderColor: STEP_COLOR }}>
+      <Handle type="target" position={Position.Top} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
+      <Handle type="target" id="left-in" position={Position.Left} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
       <div className="px-4 py-3 text-center">
-        <p className="text-xs font-medium leading-snug text-gray-800">{data.label as string}</p>
+        <p className="text-xs font-medium leading-snug" style={{ color: STEP_COLOR }}>{data.label as string}</p>
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-indigo-400 !border-white" />
-      <Handle type="source" id="right-out" position={Position.Right} className="!bg-indigo-400 !border-white" />
+      <Handle type="source" position={Position.Bottom} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
+      <Handle type="source" id="right-out" position={Position.Right} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
     </div>
   )
 }
@@ -70,16 +75,19 @@ function StepNode({ data }: { data: Record<string, unknown> }) {
 function DecisionNode({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="relative flex h-28 w-52 items-center justify-center">
-      <Handle type="target" position={Position.Top} style={{ top: 0 }} className="!bg-amber-500 !border-white !z-10" />
-      <Handle type="target" id="left-in" position={Position.Left} style={{ left: 0 }} className="!bg-amber-500 !border-white !z-10" />
+      <Handle type="target" position={Position.Top} style={{ top: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
+      <Handle type="target" id="left-in" position={Position.Left} style={{ left: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
       {/* Rotated square forms the diamond background */}
-      <div className="absolute h-20 w-20 rotate-45 rounded-md border-2 border-amber-400 bg-amber-50" />
+      <div
+        className="absolute h-20 w-20 rotate-45 rounded-md border-2"
+        style={{ borderColor: DECISION_COLOR, backgroundColor: '#FDF6DC' }}
+      />
       {/* Content counter-rotates to stay upright */}
       <div className="relative z-10 px-6 text-center">
-        <p className="text-xs font-medium leading-snug text-amber-900">{data.label as string}</p>
+        <p className="text-xs font-medium leading-snug" style={{ color: '#19323C' }}>{data.label as string}</p>
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ bottom: 0 }} className="!bg-amber-500 !border-white !z-10" />
-      <Handle type="source" id="right" position={Position.Right} style={{ right: 0 }} className="!bg-amber-500 !border-white !z-10" />
+      <Handle type="source" position={Position.Bottom} style={{ bottom: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
+      <Handle type="source" id="right" position={Position.Right} style={{ right: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
     </div>
   )
 }
@@ -110,8 +118,8 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
           {
             ...connection,
             id: dbId,
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#6366f1' },
-            style: { stroke: '#6366f1', strokeWidth: 2 },
+            markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
+            style: { stroke: EDGE_COLOR, strokeWidth: 2 },
           },
           eds
         )
@@ -143,7 +151,8 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         <button
           onClick={handleGenerateFlow}
           disabled={isPending || requirements.length === 0}
-          className="flex items-center gap-2 rounded-full bg-indigo-600 px-5 py-2 text-sm font-medium text-white shadow-md hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium text-white shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ backgroundColor: isPending ? '#d63558' : '#EE4266' }}
         >
           {isPending ? (
             <>
@@ -159,18 +168,18 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         </button>
         {generateError && <p className="text-xs text-red-500">{generateError}</p>}
         {requirements.length === 0 && !isPending && (
-          <p className="text-xs text-gray-400">Synthesise requirements first</p>
+          <p className="text-xs" style={{ color: '#7286A0' }}>Synthesise requirements first</p>
         )}
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-16 left-4 z-10 flex flex-col gap-1.5 rounded-lg border bg-white p-3 text-xs text-gray-600 shadow-sm">
+      <div className="absolute bottom-16 left-4 z-10 flex flex-col gap-1.5 rounded-lg border bg-white p-3 text-xs shadow-sm" style={{ color: '#19323C', borderColor: '#d1d9e0' }}>
         <div className="flex items-center gap-2">
-          <div className="h-3 w-5 rounded border-2 border-indigo-400 bg-white" />
+          <div className="h-3 w-5 rounded border-2" style={{ borderColor: STEP_COLOR, backgroundColor: '#fff' }} />
           <span>Step</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rotate-45 rounded-sm border-2 border-amber-400 bg-amber-50" />
+          <div className="h-3 w-3 rotate-45 rounded-sm border-2" style={{ borderColor: DECISION_COLOR, backgroundColor: '#FDF6DC' }} />
           <span>Decision</span>
         </div>
       </div>
@@ -187,11 +196,11 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         fitView
         fitViewOptions={{ padding: 0.15 }}
       >
-        <Background gap={16} color="#e5e7eb" />
+        <Background gap={16} color="#d1d9e0" />
         <Controls />
         <MiniMap
-          nodeColor={(n) => (n.type === 'decisionNode' ? '#fbbf24' : '#818cf8')}
-          maskColor="rgba(255,255,255,0.7)"
+          nodeColor={(n) => (n.type === 'decisionNode' ? DECISION_COLOR : STEP_COLOR)}
+          maskColor="rgba(243,247,240,0.7)"
         />
       </ReactFlow>
     </div>
