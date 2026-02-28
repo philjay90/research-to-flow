@@ -13,9 +13,19 @@ export interface Project {
   updated_at: string
 }
 
+export interface Flow {
+  id: string
+  project_id: string
+  name: string
+  description: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ResearchInput {
   id: string
   project_id: string
+  flow_id: string | null
   type: ResearchInputType
   content: string
   source_label: string | null
@@ -27,6 +37,7 @@ export interface ResearchInput {
 export interface FlowNode {
   id: string
   project_id: string
+  flow_id: string | null
   requirement_id: string | null
   type: string
   label: string
@@ -39,6 +50,7 @@ export interface FlowNode {
 export interface FlowEdge {
   id: string
   project_id: string
+  flow_id: string | null
   source_node_id: string
   target_node_id: string
   label: string | null
@@ -51,6 +63,7 @@ export type RequirementStatus = 'active' | 'draft' | 'stale' | 'unanchored'
 export interface Requirement {
   id: string
   project_id: string
+  flow_id: string | null
   source_input_ids: string[]
   business_opportunity: string
   user_story: string

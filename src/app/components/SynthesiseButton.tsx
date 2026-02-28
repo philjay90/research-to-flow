@@ -7,6 +7,7 @@ import { synthesiseInput } from '@/app/actions'
 
 interface Props {
   inputId: string
+  flowId: string
   projectId: string
   /** At least one requirement was generated from this input */
   isSynthesized: boolean
@@ -14,14 +15,14 @@ interface Props {
   isModified: boolean
 }
 
-export function SynthesiseButton({ inputId, projectId, isSynthesized, isModified }: Props) {
+export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, isModified }: Props) {
   const [isPending, startTransition] = useTransition()
   const [showDialog, setShowDialog] = useState(false)
   const router = useRouter()
 
   function run(mode: 'append' | 'replace') {
     startTransition(async () => {
-      await synthesiseInput(inputId, projectId, mode)
+      await synthesiseInput(inputId, flowId, projectId, mode)
       router.refresh()
     })
   }

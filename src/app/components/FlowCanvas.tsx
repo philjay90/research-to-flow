@@ -29,7 +29,7 @@ const DECISION_COLOR = '#CBA328'
 const BACK_EDGE_THRESHOLD = 30
 
 interface Props {
-  projectId: string
+  flowId: string
   initialNodes: FlowNode[]
   initialEdges: FlowEdge[]
   requirements: Requirement[]
@@ -120,7 +120,7 @@ const nodeTypes = { stepNode: StepNode, decisionNode: DecisionNode }
 
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
-export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements }: Props) {
+export default function FlowCanvas({ flowId, initialNodes, initialEdges, requirements }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(toRFNodes(initialNodes))
   const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(initialEdges, initialNodes))
   const [isPending, startTransition] = useTransition()
@@ -137,7 +137,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
   const onConnect: OnConnect = useCallback(
     async (connection) => {
       if (!connection.source || !connection.target) return
-      const dbId = await saveEdge(projectId, connection.source, connection.target)
+      const dbId = await saveEdge(flowId, connection.source, connection.target)
       if (!dbId) return
       setEdges((eds) =>
         addEdge(
@@ -153,7 +153,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         )
       )
     },
-    [projectId, setEdges]
+    [flowId, setEdges]
   )
 
   const onEdgesDelete = useCallback((deletedEdges: Edge[]) => {
@@ -163,7 +163,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
   const handleGenerateFlow = () => {
     setGenerateError(null)
     startTransition(async () => {
-      const result = await generateFlow(projectId)
+      const result = await generateFlow(flowId)
       if (result?.error) {
         setGenerateError(result.error)
         return

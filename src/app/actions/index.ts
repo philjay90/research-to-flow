@@ -30,6 +30,10 @@ function applyDagreLayout(
   return positions
 }
 
+// ---------------------------------------------------------------------------
+// Project actions
+// ---------------------------------------------------------------------------
+
 export async function createProject(formData: FormData) {
   const name = formData.get('name') as string
   const description = formData.get('description') as string
@@ -50,14 +54,58 @@ export async function createProject(formData: FormData) {
   redirect(`/projects/${data.id}`)
 }
 
+export async function deleteProject(projectId: string) {
+  await supabase.from('project').delete().eq('id', projectId)
+  redirect('/')
+}
+
+// ---------------------------------------------------------------------------
+// Flow actions
+// ---------------------------------------------------------------------------
+
+export async function createFlow(formData: FormData) {
+  const projectId = formData.get('project_id') as string
+  const name = formData.get('name') as string
+  const description = formData.get('description') as string
+
+  if (!projectId || !name?.trim()) return
+
+  const { data, error } = await supabase
+    .from('flow')
+    .insert({
+      project_id: projectId,
+      name: name.trim(),
+      description: description?.trim() || null,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    console.error('Failed to create flow:', error)
+    return
+  }
+
+  redirect(`/projects/${projectId}/flows/${data.id}`)
+}
+
+export async function deleteFlow(flowId: string, projectId: string) {
+  await supabase.from('flow').delete().eq('id', flowId)
+  revalidatePath(`/projects/${projectId}`)
+}
+
+// ---------------------------------------------------------------------------
+// Research input actions
+// ---------------------------------------------------------------------------
+
 export async function addResearchInput(formData: FormData) {
   const projectId = formData.get('project_id') as string
+  const flowId = formData.get('flow_id') as string
   const type = formData.get('type') as string
   const content = formData.get('content') as string
   const sourceLabel = formData.get('source_label') as string
   const attachment = formData.get('attachment') as File | null
 
-  if (!projectId || !type || !content?.trim()) return
+  if (!projectId || !flowId || !type || !content?.trim()) return
 
   let attachmentUrl: string | null = null
 
@@ -82,6 +130,7 @@ export async function addResearchInput(formData: FormData) {
 
   const { error } = await supabase.from('research_input').insert({
     project_id: projectId,
+    flow_id: flowId,
     type,
     content: content.trim(),
     source_label: sourceLabel?.trim() || null,
@@ -93,22 +142,32 @@ export async function addResearchInput(formData: FormData) {
     return
   }
 
-  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
+
+export async function deleteResearchInput(inputId: string, flowId: string, projectId: string) {
+  await supabase.from('research_input').delete().eq('id', inputId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+// ---------------------------------------------------------------------------
+// Requirement actions
+// ---------------------------------------------------------------------------
 
 export async function synthesiseInput(
   inputId: string,
+  flowId: string,
   projectId: string,
   mode: 'append' | 'replace' = 'append'
 ) {
-  if (!inputId || !projectId) return
+  if (!inputId || !flowId || !projectId) return
 
   // Replace mode: delete requirements previously generated from this input
   if (mode === 'replace') {
     const { data: existingReqs } = await supabase
       .from('requirement')
       .select('id, source_input_ids')
-      .eq('project_id', projectId)
+      .eq('flow_id', flowId)
 
     const toDelete = (existingReqs ?? [])
       .filter((r: { source_input_ids: string[] }) => r.source_input_ids.includes(inputId))
@@ -176,6 +235,7 @@ ${input.content}`,
 
   const rows = requirements.map((req) => ({
     project_id: projectId,
+    flow_id: flowId,
     source_input_ids: [inputId],
     business_opportunity: req.business_opportunity,
     user_story: req.user_story,
@@ -191,23 +251,34 @@ ${input.content}`,
     return
   }
 
-  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function deleteRequirement(requirementId: string, flowId: string, projectId: string) {
+  await supabase.from('requirement').delete().eq('id', requirementId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
 // ---------------------------------------------------------------------------
-// Flow actions
+// Canvas actions
 // ---------------------------------------------------------------------------
 
-// generateFlow: asks Claude to interpret all requirements and produce an
-// optimal task-flow map. Clears existing nodes/edges first, then saves fresh.
-export async function generateFlow(projectId: string) {
-  // Fetch all requirements for this project
+// generateFlow: asks Claude to interpret all requirements for a flow and produce
+// an optimal task-flow map. Clears existing nodes/edges first, then saves fresh.
+export async function generateFlow(flowId: string) {
+  // Fetch all requirements for this flow
   const { data: requirements } = await supabase
     .from('requirement')
     .select('business_opportunity, user_story, acceptance_criteria, dfv_tag')
-    .eq('project_id', projectId)
+    .eq('flow_id', flowId)
 
   if (!requirements || requirements.length === 0) return { error: 'No requirements to generate from' }
+
+  // Fetch the flow to get project_id
+  const { data: flow } = await supabase.from('flow').select('project_id').eq('id', flowId).single()
+  if (!flow) return { error: 'Flow not found' }
+
+  const projectId = flow.project_id
 
   const requirementsSummary = requirements
     .map((r: { business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null }, i: number) =>
@@ -264,36 +335,37 @@ ${requirementsSummary}`,
 
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
-  let flow: {
+  let flowData: {
     nodes: Array<{ id: string; type: string; label: string }>
     edges: Array<{ source: string; target: string; label?: string | null }>
   }
 
   try {
     const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-    flow = JSON.parse(cleaned)
-    if (!flow.nodes || !flow.edges) throw new Error('Invalid shape')
+    flowData = JSON.parse(cleaned)
+    if (!flowData.nodes || !flowData.edges) throw new Error('Invalid shape')
   } catch (e) {
     console.error('Failed to parse Claude flow response:', responseText, e)
     return { error: 'Failed to parse flow from Claude' }
   }
 
   // Compute clean layout with dagre — ignore any coordinates from Claude
-  const positions = applyDagreLayout(flow.nodes, flow.edges)
+  const positions = applyDagreLayout(flowData.nodes, flowData.edges)
 
-  // Clear existing flow data for this project
-  await supabase.from('flow_edge').delete().eq('project_id', projectId)
-  await supabase.from('flow_node').delete().eq('project_id', projectId)
+  // Clear existing flow data for this flow
+  await supabase.from('flow_edge').delete().eq('flow_id', flowId)
+  await supabase.from('flow_node').delete().eq('flow_id', flowId)
 
   // Insert new nodes and collect their real DB IDs
   const nodeIdMap = new Map<string, string>() // tempId → real UUID
 
-  for (const node of flow.nodes) {
+  for (const node of flowData.nodes) {
     const pos = positions.get(node.id) ?? { x: 0, y: 0 }
     const { data, error } = await supabase
       .from('flow_node')
       .insert({
         project_id: projectId,
+        flow_id: flowId,
         requirement_id: null,
         type: node.type,
         label: node.label,
@@ -309,12 +381,18 @@ ${requirementsSummary}`,
   }
 
   // Insert edges using real UUIDs
-  const edgeRows = flow.edges
+  const edgeRows = flowData.edges
     .map((e) => {
       const sourceId = nodeIdMap.get(e.source)
       const targetId = nodeIdMap.get(e.target)
       if (!sourceId || !targetId) return null
-      return { project_id: projectId, source_node_id: sourceId, target_node_id: targetId, label: e.label ?? null }
+      return {
+        project_id: projectId,
+        flow_id: flowId,
+        source_node_id: sourceId,
+        target_node_id: targetId,
+        label: e.label ?? null,
+      }
     })
     .filter(Boolean)
 
@@ -332,10 +410,19 @@ export async function saveNodePosition(nodeId: string, x: number, y: number) {
     .eq('id', nodeId)
 }
 
-export async function saveEdge(projectId: string, sourceNodeId: string, targetNodeId: string) {
+export async function saveEdge(flowId: string, sourceNodeId: string, targetNodeId: string) {
+  // Fetch flow to get project_id
+  const { data: flow } = await supabase.from('flow').select('project_id').eq('id', flowId).single()
+  if (!flow) return null
+
   const { data, error } = await supabase
     .from('flow_edge')
-    .insert({ project_id: projectId, source_node_id: sourceNodeId, target_node_id: targetNodeId })
+    .insert({
+      project_id: flow.project_id,
+      flow_id: flowId,
+      source_node_id: sourceNodeId,
+      target_node_id: targetNodeId,
+    })
     .select('id')
     .single()
 
@@ -348,19 +435,4 @@ export async function saveEdge(projectId: string, sourceNodeId: string, targetNo
 
 export async function deleteEdge(edgeId: string) {
   await supabase.from('flow_edge').delete().eq('id', edgeId)
-}
-
-export async function deleteProject(projectId: string) {
-  await supabase.from('project').delete().eq('id', projectId)
-  redirect('/')
-}
-
-export async function deleteRequirement(requirementId: string, projectId: string) {
-  await supabase.from('requirement').delete().eq('id', requirementId)
-  revalidatePath(`/projects/${projectId}`)
-}
-
-export async function deleteResearchInput(inputId: string, projectId: string) {
-  await supabase.from('research_input').delete().eq('id', inputId)
-  revalidatePath(`/projects/${projectId}`)
 }
