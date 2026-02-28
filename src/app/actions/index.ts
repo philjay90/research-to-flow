@@ -96,11 +96,28 @@ export async function addResearchInput(formData: FormData) {
   revalidatePath(`/projects/${projectId}`)
 }
 
-export async function synthesiseInput(formData: FormData) {
-  const inputId = formData.get('input_id') as string
-  const projectId = formData.get('project_id') as string
-
+export async function synthesiseInput(
+  inputId: string,
+  projectId: string,
+  mode: 'append' | 'replace' = 'append'
+) {
   if (!inputId || !projectId) return
+
+  // Replace mode: delete requirements previously generated from this input
+  if (mode === 'replace') {
+    const { data: existingReqs } = await supabase
+      .from('requirement')
+      .select('id, source_input_ids')
+      .eq('project_id', projectId)
+
+    const toDelete = (existingReqs ?? [])
+      .filter((r: { source_input_ids: string[] }) => r.source_input_ids.includes(inputId))
+      .map((r: { id: string }) => r.id)
+
+    if (toDelete.length > 0) {
+      await supabase.from('requirement').delete().in('id', toDelete)
+    }
+  }
 
   const { data: input, error: inputError } = await supabase
     .from('research_input')

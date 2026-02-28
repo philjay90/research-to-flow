@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { addResearchInput, synthesiseInput, deleteRequirement, deleteResearchInput } from '@/app/actions'
+import { addResearchInput, deleteRequirement, deleteResearchInput } from '@/app/actions'
 import type { Project, ResearchInput, Requirement } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { AppHeader } from '@/app/components/AppHeader'
 import { DeleteButton } from '@/app/components/DeleteButton'
+import { SynthesiseButton } from '@/app/components/SynthesiseButton'
 
 const INPUT_TYPE_LABELS: Record<string, string> = {
   interview_notes: 'Interview Notes',
@@ -66,6 +67,17 @@ export default async function ProjectPage({
   ])
 
   const p = project as Project
+  const reqs = (requirements ?? []) as Requirement[]
+  const ins  = (inputs  ?? []) as ResearchInput[]
+
+  // For each input: find the most recent requirement created_at from that input
+  const lastSynthAt = new Map<string, string>()
+  for (const req of reqs) {
+    for (const srcId of req.source_input_ids) {
+      const existing = lastSynthAt.get(srcId)
+      if (!existing || req.created_at > existing) lastSynthAt.set(srcId, req.created_at)
+    }
+  }
 
   return (
     <>
@@ -91,11 +103,15 @@ export default async function ProjectPage({
           <section>
             <h2 className="mb-4 text-lg font-semibold text-foreground">Research Inputs</h2>
 
-            {!inputs || inputs.length === 0 ? (
+            {ins.length === 0 ? (
               <p className="text-sm text-[#7286A0]">No inputs yet. Add one below.</p>
             ) : (
               <ul className="space-y-3">
-                {(inputs as ResearchInput[]).map((input) => (
+                {ins.map((input) => {
+                  const synthAt = lastSynthAt.get(input.id)
+                  const isSynthesized = !!synthAt
+                  const isModified = isSynthesized && input.updated_at > synthAt!
+                  return (
                   <li key={input.id}>
                     <Card>
                       <CardContent className="p-4">
@@ -110,18 +126,12 @@ export default async function ProjectPage({
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-1">
-                            <form action={synthesiseInput}>
-                              <input type="hidden" name="input_id" value={input.id} />
-                              <input type="hidden" name="project_id" value={id} />
-                              <Button
-                                type="submit"
-                                variant="outline"
-                                size="sm"
-                                className="h-7 text-xs border-[#EE4266] text-[#EE4266] hover:bg-[#EE4266]/10"
-                              >
-                                Synthesise
-                              </Button>
-                            </form>
+                            <SynthesiseButton
+                              inputId={input.id}
+                              projectId={id}
+                              isSynthesized={isSynthesized}
+                              isModified={isModified}
+                            />
                             <DeleteButton
                               action={deleteResearchInput.bind(null, input.id, id)}
                               confirmMessage={`Delete this research input? Associated requirements will not be deleted automatically.`}
@@ -148,7 +158,8 @@ export default async function ProjectPage({
                       </CardContent>
                     </Card>
                   </li>
-                ))}
+                  )
+                })}
               </ul>
             )}
 
@@ -238,7 +249,7 @@ export default async function ProjectPage({
               </p>
             ) : (
               <ul className="space-y-4">
-                {(requirements as Requirement[]).map((req) => (
+                {reqs.map((req) => (
                   <li key={req.id}>
                     <Card>
                       <CardContent className="p-5">
