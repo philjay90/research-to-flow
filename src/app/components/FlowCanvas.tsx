@@ -21,9 +21,12 @@ import { saveNodePosition, saveEdge, deleteEdge, generateFlow } from '@/app/acti
 import type { FlowNode, FlowEdge, Requirement } from '@/types'
 
 // Brand palette constants
-const EDGE_COLOR = '#19323C'   // Jet Black for arrows
-const STEP_COLOR = '#19323C'   // Jet Black border for step nodes
-const DECISION_COLOR = '#CBA328' // Golden Bronze for decision nodes
+const EDGE_COLOR = '#19323C'
+const STEP_COLOR = '#19323C'
+const DECISION_COLOR = '#CBA328'
+
+// Threshold: if target is this many px above source, treat as a back-edge
+const BACK_EDGE_THRESHOLD = 30
 
 interface Props {
   projectId: string
@@ -41,22 +44,49 @@ function toRFNodes(nodes: FlowNode[]): Node[] {
   }))
 }
 
-function toRFEdges(edges: FlowEdge[]): Edge[] {
-  return edges.map((e) => ({
-    id: e.id,
-    source: e.source_node_id,
-    target: e.target_node_id,
-    label: e.label ?? undefined,
-    labelStyle: { fontSize: 11, fontWeight: 600, fill: '#19323C' },
-    labelBgStyle: { fill: '#F3F7F0', fillOpacity: 0.95 },
-    labelBgPadding: [4, 6] as [number, number],
-    labelBgBorderRadius: 4,
-    markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
-    style: { stroke: EDGE_COLOR, strokeWidth: 2 },
-  }))
+/**
+ * Convert DB edges to React Flow edges.
+ * Back-edges (target sits above source) are routed through the left/right
+ * handles instead of bottom/top so they don't produce awkward downward loops.
+ * All edges use `smoothstep` for clean orthogonal routing.
+ */
+function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
+  const posMap = new Map(nodes.map((n) => [n.id, n.position_y]))
+  const typeMap = new Map(nodes.map((n) => [n.id, n.type]))
+
+  return edges.map((e) => {
+    const sourceY = posMap.get(e.source_node_id) ?? 0
+    const targetY = posMap.get(e.target_node_id) ?? 0
+    const sourceType = typeMap.get(e.source_node_id)
+
+    // Back-edge: target is significantly above source → route via sides
+    const isBackEdge = targetY < sourceY - BACK_EDGE_THRESHOLD
+    const sourceHandle = isBackEdge
+      ? sourceType === 'decision' ? 'right' : 'right-out'
+      : undefined
+    const targetHandle = isBackEdge ? 'left-in' : undefined
+
+    return {
+      id: e.id,
+      source: e.source_node_id,
+      target: e.target_node_id,
+      sourceHandle,
+      targetHandle,
+      type: 'smoothstep',
+
+      label: e.label ?? undefined,
+      labelStyle: { fontSize: 11, fontWeight: 600, fill: '#19323C' },
+      labelBgStyle: { fill: '#F3F7F0', fillOpacity: 0.95 },
+      labelBgPadding: [4, 6] as [number, number],
+      labelBgBorderRadius: 4,
+      markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
+      style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
+    }
+  })
 }
 
-// Rounded rectangle — for linear task steps
+// ── Node components ──────────────────────────────────────────────────────────
+
 function StepNode({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="w-52 rounded-xl border-2 bg-white shadow-sm" style={{ borderColor: STEP_COLOR }}>
@@ -71,18 +101,12 @@ function StepNode({ data }: { data: Record<string, unknown> }) {
   )
 }
 
-// Diamond — for branching decision points
 function DecisionNode({ data }: { data: Record<string, unknown> }) {
   return (
     <div className="relative flex h-28 w-52 items-center justify-center">
       <Handle type="target" position={Position.Top} style={{ top: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
       <Handle type="target" id="left-in" position={Position.Left} style={{ left: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
-      {/* Rotated square forms the diamond background */}
-      <div
-        className="absolute h-20 w-20 rotate-45 rounded-md border-2"
-        style={{ borderColor: DECISION_COLOR, backgroundColor: '#FDF6DC' }}
-      />
-      {/* Content counter-rotates to stay upright */}
+      <div className="absolute h-20 w-20 rotate-45 rounded-md border-2" style={{ borderColor: DECISION_COLOR, backgroundColor: '#FDF6DC' }} />
       <div className="relative z-10 px-6 text-center">
         <p className="text-xs font-medium leading-snug" style={{ color: '#19323C' }}>{data.label as string}</p>
       </div>
@@ -94,9 +118,11 @@ function DecisionNode({ data }: { data: Record<string, unknown> }) {
 
 const nodeTypes = { stepNode: StepNode, decisionNode: DecisionNode }
 
+// ── Canvas ───────────────────────────────────────────────────────────────────
+
 export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(toRFNodes(initialNodes))
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(initialEdges))
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(initialEdges, initialNodes))
   const [isPending, startTransition] = useTransition()
   const [generateError, setGenerateError] = useState<string | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -118,8 +144,10 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
           {
             ...connection,
             id: dbId,
+            type: 'smoothstep',
+      
             markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
-            style: { stroke: EDGE_COLOR, strokeWidth: 2 },
+            style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
           },
           eds
         )
@@ -193,6 +221,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         onEdgesDelete={onEdgesDelete}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
+        defaultEdgeOptions={{ type: 'smoothstep' }}
         fitView
         fitViewOptions={{ padding: 0.15 }}
       >

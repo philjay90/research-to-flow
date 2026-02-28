@@ -15,7 +15,7 @@ function applyDagreLayout(
   edges: Array<{ source: string; target: string }>
 ): Map<string, { x: number; y: number }> {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
-  g.setGraph({ rankdir: 'TB', ranksep: 80, nodesep: 60 })
+  g.setGraph({ rankdir: 'TB', ranksep: 120, nodesep: 90, acyclicer: 'greedy', ranker: 'network-simplex' })
   nodes.forEach((n) => {
     g.setNode(n.id, { width: NODE_W, height: n.type === 'decision' ? NODE_H_DECISION : NODE_H_STEP })
   })
