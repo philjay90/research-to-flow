@@ -11,7 +11,7 @@ import {
   useEdgesState,
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
+  getSmoothStepPath,
   type Node,
   type Edge,
   type EdgeProps,
@@ -103,10 +103,10 @@ function LabelledEdge({
 }: EdgeProps) {
   const isBackEdge = !!(data as Record<string, unknown>)?.isBackEdge
 
-  const [edgePath] = getBezierPath({
+  const [edgePath] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
-    curvature: 0.3,
+    borderRadius: 8,
   })
 
   // Forward edges: label sits above the target handle (on the vertical descent).

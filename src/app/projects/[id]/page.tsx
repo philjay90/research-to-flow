@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase'
 import { deleteFlow } from '@/app/actions'
 import type { Project, Flow } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { AppHeader } from '@/app/components/AppHeader'
 import { DeleteButton } from '@/app/components/DeleteButton'
 
@@ -36,14 +35,8 @@ export default async function ProjectPage({
   const counts = await Promise.all(
     flowList.map(async (f) => {
       const [{ count: inputCount }, { count: reqCount }] = await Promise.all([
-        supabase
-          .from('research_input')
-          .select('id', { count: 'exact', head: true })
-          .eq('flow_id', f.id),
-        supabase
-          .from('requirement')
-          .select('id', { count: 'exact', head: true })
-          .eq('flow_id', f.id),
+        supabase.from('research_input').select('id', { count: 'exact', head: true }).eq('flow_id', f.id),
+        supabase.from('requirement').select('id', { count: 'exact', head: true }).eq('flow_id', f.id),
       ])
       return { flowId: f.id, inputCount: inputCount ?? 0, reqCount: reqCount ?? 0 }
     })
@@ -55,66 +48,70 @@ export default async function ProjectPage({
     <>
       <AppHeader crumbs={[{ label: p.name }]} />
 
-      <main className="mx-auto max-w-3xl px-6 py-10">
+      <main className="mx-auto max-w-3xl px-8 py-16">
         {p.description && (
-          <p className="mb-6 text-[#7286A0]">{p.description}</p>
+          <p className="mb-4 text-[#7286A0] leading-relaxed">{p.description}</p>
         )}
 
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-10 flex items-end justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Flows</h1>
-            <p className="mt-1 text-sm text-[#7286A0]">Named flows within this project</p>
+            <p className="mb-1 text-sm font-medium text-[#7286A0]">Named flows within this project</p>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Flows</h1>
           </div>
-          <Button asChild className="bg-[#EE4266] text-white hover:bg-[#d63558]">
-            <Link href={`/projects/${id}/flows/new`}>New Flow</Link>
+          <Button asChild className="bg-[#EE4266] text-white hover:bg-[#d63558] rounded-full px-5">
+            <Link href={`/projects/${id}/flows/new`}>+ New Flow</Link>
           </Button>
         </div>
 
         {flowList.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-[#7286A0]">No flows yet.</p>
-              <p className="mt-1 text-sm text-[#7286A0]">Create one to start adding research inputs.</p>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20 text-center shadow-sm">
+            <p className="text-lg font-medium text-foreground">No flows yet</p>
+            <p className="mt-2 text-sm text-[#7286A0]">Create a flow to start adding research inputs.</p>
+            <Button asChild className="mt-6 bg-[#EE4266] text-white hover:bg-[#d63558] rounded-full px-5">
+              <Link href={`/projects/${id}/flows/new`}>Create Flow</Link>
+            </Button>
+          </div>
         ) : (
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {flowList.map((flow) => {
               const c = countMap.get(flow.id)
               return (
                 <li key={flow.id}>
-                  <Card className="transition-shadow hover:shadow-md hover:border-[#EE4266]/40">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <Link href={`/projects/${id}/flows/${flow.id}`} className="min-w-0 flex-1">
-                          <p className="text-xs font-semibold uppercase tracking-wider text-[#7286A0]">
-                            Flow
-                          </p>
-                          <p className="mt-0.5 font-semibold text-foreground">{flow.name}</p>
-                          {flow.description && (
-                            <p className="mt-1 text-sm text-[#7286A0]">{flow.description}</p>
-                          )}
-                          <div className="mt-2 flex items-center gap-4 text-xs text-[#7286A0]/70">
-                            <span>{c?.inputCount ?? 0} input{(c?.inputCount ?? 0) !== 1 ? 's' : ''}</span>
-                            <span>·</span>
-                            <span>{c?.reqCount ?? 0} requirement{(c?.reqCount ?? 0) !== 1 ? 's' : ''}</span>
-                            <span>·</span>
-                            <span>Created {new Date(flow.created_at).toLocaleDateString()}</span>
-                          </div>
-                        </Link>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <Button asChild size="sm" variant="outline"
-                            className="h-7 text-xs border-[#19323C] text-[#19323C] hover:bg-[#19323C]/10">
-                            <Link href={`/projects/${id}/flows/${flow.id}/canvas`}>Canvas →</Link>
-                          </Button>
-                          <DeleteButton
-                            action={deleteFlow.bind(null, flow.id, id)}
-                            confirmMessage={`Delete "${flow.name}"? This will permanently remove all inputs, requirements, and the canvas for this flow. This cannot be undone.`}
-                          />
+                  <div className="group rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md">
+                    <div className="flex items-center gap-4 p-6">
+                      <Link href={`/projects/${id}/flows/${flow.id}`} className="min-w-0 flex-1">
+                        <p className="font-semibold text-foreground text-base group-hover:text-[#EE4266] transition-colors">
+                          {flow.name}
+                        </p>
+                        {flow.description && (
+                          <p className="mt-1 text-sm text-[#7286A0] leading-relaxed">{flow.description}</p>
+                        )}
+                        <div className="mt-3 flex items-center gap-3 text-xs text-[#7286A0]/70">
+                          <span className="rounded-full bg-[#f3f7f0] px-2.5 py-0.5 font-medium text-[#7286A0]">
+                            {c?.inputCount ?? 0} {(c?.inputCount ?? 0) === 1 ? 'input' : 'inputs'}
+                          </span>
+                          <span className="rounded-full bg-[#f3f7f0] px-2.5 py-0.5 font-medium text-[#7286A0]">
+                            {c?.reqCount ?? 0} {(c?.reqCount ?? 0) === 1 ? 'requirement' : 'requirements'}
+                          </span>
+                          <span className="text-[#7286A0]/50">
+                            {new Date(flow.created_at).toLocaleDateString()}
+                          </span>
                         </div>
+                      </Link>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <Button
+                          asChild size="sm" variant="outline"
+                          className="rounded-full text-xs border-[#19323C] text-[#19323C] hover:bg-[#19323C] hover:text-white transition-colors"
+                        >
+                          <Link href={`/projects/${id}/flows/${flow.id}/canvas`}>Canvas →</Link>
+                        </Button>
+                        <DeleteButton
+                          action={deleteFlow.bind(null, flow.id, id)}
+                          confirmMessage={`Delete "${flow.name}"? This will permanently remove all inputs, requirements, and the canvas for this flow. This cannot be undone.`}
+                        />
                       </div>
-                    </CardContent>
-                  </Card>
+                    </div>
+                  </div>
                 </li>
               )
             })}
