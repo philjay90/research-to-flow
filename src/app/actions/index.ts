@@ -278,8 +278,51 @@ export async function deleteRequirement(requirementId: string, flowId: string, p
   revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
+export async function updateResearchInput(
+  inputId: string,
+  flowId: string,
+  projectId: string,
+  data: { type: string; source_label: string | null; content: string }
+) {
+  if (!data.content?.trim()) return
+  await supabase
+    .from('research_input')
+    .update({
+      type: data.type,
+      source_label: data.source_label?.trim() || null,
+      content: data.content.trim(),
+    })
+    .eq('id', inputId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
 export async function deleteAllInputs(flowId: string, projectId: string) {
   await supabase.from('research_input').delete().eq('flow_id', flowId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function updateRequirement(
+  requirementId: string,
+  flowId: string,
+  projectId: string,
+  data: {
+    user_story: string
+    business_opportunity: string
+    acceptance_criteria: string[]
+    dfv_tag: string | null
+  }
+) {
+  if (!data.user_story?.trim()) return
+  await supabase
+    .from('requirement')
+    .update({
+      user_story: data.user_story.trim(),
+      business_opportunity: data.business_opportunity.trim(),
+      acceptance_criteria: data.acceptance_criteria.filter((c) => c.trim()),
+      dfv_tag: data.dfv_tag || null,
+      status: 'edited',
+    })
+    .eq('id', requirementId)
   revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 

@@ -58,7 +58,7 @@ export interface FlowEdge {
 }
 
 export type DFVTag = 'desirability' | 'feasibility' | 'viability'
-export type RequirementStatus = 'active' | 'draft' | 'stale' | 'unanchored'
+export type RequirementStatus = 'active' | 'draft' | 'stale' | 'unanchored' | 'edited'
 
 export interface Requirement {
   id: string

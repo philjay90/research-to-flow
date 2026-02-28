@@ -4,15 +4,14 @@ import { supabase } from '@/lib/supabase'
 import { addResearchInput, deleteRequirement, deleteResearchInput, updateFlow, deleteAllInputs, deleteAllRequirements } from '@/app/actions'
 import type { Project, Flow, ResearchInput, Requirement } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/app/components/AppHeader'
-import { DeleteButton } from '@/app/components/DeleteButton'
-import { SynthesiseButton } from '@/app/components/SynthesiseButton'
 import { EditableHeader } from '@/app/components/EditableHeader'
 import { DeleteAllButton } from '@/app/components/DeleteAllButton'
+import { EditableInputCard } from '@/app/components/EditableInputCard'
+import { EditableRequirementCard } from '@/app/components/EditableRequirementCard'
 
 const INPUT_TYPE_LABELS: Record<string, string> = {
   interview_notes: 'Interview Notes',
@@ -20,22 +19,6 @@ const INPUT_TYPE_LABELS: Record<string, string> = {
   screenshot: 'Screenshot',
   business_requirements: 'Business Requirements',
   other: 'Other',
-}
-
-const DFV_LABELS: Record<string, string> = {
-  desirability: 'Desirability',
-  feasibility: 'Feasibility',
-  viability: 'Viability',
-}
-
-function statusStyle(status: string): React.CSSProperties {
-  const map: Record<string, React.CSSProperties> = {
-    active:     { backgroundColor: '#F0E100', color: '#1D1D1F' },
-    draft:      { backgroundColor: '#F5F5F7', color: '#1D1D1F' },
-    stale:      { backgroundColor: '#C97D60', color: '#ffffff' },
-    unanchored: { backgroundColor: '#FAF0EB', color: '#C97D60' },
-  }
-  return map[status] ?? { backgroundColor: '#F5F5F7', color: '#1D1D1F' }
 }
 
 export default async function FlowDetailPage({
@@ -136,46 +119,18 @@ export default async function FlowDetailPage({
                   const isModified = isSynthesized && input.updated_at > synthAt!
                   return (
                     <li key={input.id}>
-                      <div className="rounded-2xl bg-white p-5 shadow-sm">
-                        {/* Header row */}
-                        <div className="mb-2 flex items-start justify-between gap-2">
-                          <p className="text-sm font-semibold text-foreground leading-snug">
-                            {input.source_label || INPUT_TYPE_LABELS[input.type] || input.type}
-                          </p>
-                          <div className="flex shrink-0 items-center gap-1">
-                            <SynthesiseButton
-                              inputId={input.id}
-                              flowId={flowId}
-                              projectId={id}
-                              isSynthesized={isSynthesized}
-                              isModified={isModified}
-                            />
-                            <DeleteButton
-                              action={deleteResearchInput.bind(null, input.id, flowId, id)}
-                              confirmMessage="Delete this research input? Associated requirements will not be deleted automatically."
-                            />
-                          </div>
-                        </div>
-
-                        {/* Type badge */}
-                        <Badge
-                          style={{ backgroundColor: '#1D1D1F', color: '#fff' }}
-                          className="mb-3 text-xs rounded-full"
-                        >
-                          {INPUT_TYPE_LABELS[input.type] ?? input.type}
-                        </Badge>
-
-                        <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
-                          {input.content}
-                        </p>
-                        {input.attachment_url && (
-                          <img
-                            src={input.attachment_url}
-                            alt="Attached screenshot"
-                            className="mt-3 max-h-48 rounded-xl border object-contain"
-                          />
-                        )}
-                      </div>
+                      <EditableInputCard
+                        inputId={input.id}
+                        flowId={flowId}
+                        projectId={id}
+                        type={input.type}
+                        sourceLabel={input.source_label}
+                        content={input.content}
+                        attachmentUrl={input.attachment_url}
+                        isSynthesized={isSynthesized}
+                        isModified={isModified}
+                        onDelete={deleteResearchInput.bind(null, input.id, flowId, id)}
+                      />
                     </li>
                   )
                 })}
@@ -283,62 +238,38 @@ export default async function FlowDetailPage({
               </p>
             ) : (
               <>
+              {reqs.some((r) => r.status === 'edited') && (
+                <div className="mb-4 flex items-start gap-3 rounded-2xl border border-[#C97D60] bg-[#FAF0EB] px-4 py-3">
+                  <span className="mt-0.5 text-[#C97D60] text-sm">⚠</span>
+                  <p className="text-sm text-[#C97D60]">
+                    One or more requirements have been manually edited. Consider{' '}
+                    <Link href={`/projects/${id}/flows/${flowId}/canvas`} className="font-semibold underline underline-offset-2">
+                      regenerating the canvas
+                    </Link>{' '}
+                    to reflect your changes.
+                  </p>
+                </div>
+              )}
               <ul className="space-y-4">
                 {reqs.map((req) => {
-                  // Resolve source input labels for this requirement
                   const sourceLabels = req.source_input_ids
                     .map((sid) => inputLabelMap.get(sid))
                     .filter((l): l is string => !!l)
 
                   return (
                     <li key={req.id}>
-                      <div className="rounded-2xl bg-white p-5 shadow-sm">
-                        {/* Source attribution */}
-                        {sourceLabels.length > 0 && (
-                          <p className="mb-3 text-xs text-foreground/60">
-                            From: {sourceLabels.join(', ')}
-                          </p>
-                        )}
-
-                        {/* User story + delete */}
-                        <div className="mb-3 flex items-start justify-between gap-2">
-                          <p className="text-sm italic text-foreground leading-snug flex-1">
-                            {req.user_story}
-                          </p>
-                          <DeleteButton
-                            action={deleteRequirement.bind(null, req.id, flowId, id)}
-                            confirmMessage="Delete this requirement? If you have a generated canvas, it may no longer reflect all requirements — consider regenerating after deleting."
-                          />
-                        </div>
-
-                        {/* Badges */}
-                        <div className="mb-3 flex flex-wrap items-center gap-2">
-                          <Badge style={statusStyle(req.status)} className="text-xs font-medium rounded-full">
-                            {req.status}
-                          </Badge>
-                          {req.dfv_tag && (
-                            <Badge
-                              style={{ backgroundColor: '#C97D60', color: '#ffffff' }}
-                              className="text-xs font-medium rounded-full"
-                            >
-                              {DFV_LABELS[req.dfv_tag] ?? req.dfv_tag}
-                            </Badge>
-                          )}
-                        </div>
-
-                        <p className="mb-3 text-sm font-medium text-foreground">
-                          {req.business_opportunity}
-                        </p>
-
-                        <ul className="space-y-1">
-                          {req.acceptance_criteria.map((criterion, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="mt-0.5 text-foreground/40">✓</span>
-                              <span>{criterion}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                      <EditableRequirementCard
+                        requirementId={req.id}
+                        flowId={flowId}
+                        projectId={id}
+                        userStory={req.user_story}
+                        businessOpportunity={req.business_opportunity}
+                        acceptanceCriteria={req.acceptance_criteria}
+                        dfvTag={req.dfv_tag}
+                        status={req.status}
+                        sourceLabels={sourceLabels}
+                        onDelete={deleteRequirement.bind(null, req.id, flowId, id)}
+                      />
                     </li>
                   )
                 })}
