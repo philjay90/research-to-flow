@@ -73,7 +73,7 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-2 font-semibold text-foreground">Re-synthesise this input?</h3>
-            <p className="mb-5 text-sm text-[#86868B]">
+            <p className="mb-5 text-sm text-foreground">
               This input already has requirements generated from it. What would you like to do with the existing ones?
             </p>
             <div className="flex flex-col gap-2">
@@ -96,7 +96,7 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
                 onClick={() => setShowDialog(false)}
                 variant="ghost"
                 size="sm"
-                className="w-full text-[#86868B] rounded-full"
+                className="w-full text-foreground rounded-full"
               >
                 Cancel
               </Button>

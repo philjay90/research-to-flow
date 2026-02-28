@@ -36,12 +36,12 @@ export default async function NewFlowPage({
 
       <main className="mx-auto max-w-lg px-8 py-16">
         <div className="mb-8">
-          <p className="mb-1 text-sm font-medium text-[#86868B]">Add a flow</p>
+          <p className="mb-1 text-sm font-medium text-foreground">Add a flow</p>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">New Flow</h1>
         </div>
 
         <div className="rounded-2xl bg-white p-8 shadow-sm">
-          <p className="mb-6 text-sm text-[#86868B] leading-relaxed">
+          <p className="mb-6 text-sm text-foreground leading-relaxed">
             Each flow has its own research inputs, synthesised requirements, and canvas.
           </p>
           <form action={createFlow} className="space-y-6">
@@ -65,7 +65,7 @@ export default async function NewFlowPage({
             <div className="space-y-2">
               <Label htmlFor="description" className="text-sm font-semibold text-foreground">
                 Description{' '}
-                <span className="font-normal text-[#86868B]">(optional)</span>
+                <span className="font-normal text-foreground/50">(optional)</span>
               </Label>
               <Textarea
                 id="description"
@@ -80,7 +80,7 @@ export default async function NewFlowPage({
               <Button type="submit" className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 font-semibold">
                 Create Flow
               </Button>
-              <Button asChild variant="ghost" className="text-[#86868B] rounded-full">
+              <Button asChild variant="ghost" className="text-foreground rounded-full">
                 <a href={`/projects/${id}`}>Cancel</a>
               </Button>
             </div>

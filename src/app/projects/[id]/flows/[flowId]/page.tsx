@@ -29,7 +29,7 @@ const DFV_LABELS: Record<string, string> = {
 function statusStyle(status: string): React.CSSProperties {
   const map: Record<string, React.CSSProperties> = {
     active:     { backgroundColor: '#F0E100', color: '#1D1D1F' },
-    draft:      { backgroundColor: '#F5F5F7', color: '#86868B' },
+    draft:      { backgroundColor: '#F5F5F7', color: '#1D1D1F' },
     stale:      { backgroundColor: '#C97D60', color: '#ffffff' },
     unanchored: { backgroundColor: '#FAF0EB', color: '#C97D60' },
   }
@@ -103,9 +103,13 @@ export default async function FlowDetailPage({
       />
 
       <main className="mx-auto max-w-6xl px-8 py-12">
-        {f.description && (
-          <p className="mb-8 text-[#86868B] leading-relaxed">{f.description}</p>
-        )}
+        {/* Flow title + description */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">{f.name}</h1>
+          {f.description && (
+            <p className="mt-3 text-base text-foreground leading-relaxed">{f.description}</p>
+          )}
+        </div>
 
         {/* Two-column layout */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -115,14 +119,14 @@ export default async function FlowDetailPage({
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Inputs</h2>
               {ins.length > 0 && (
-                <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-medium text-[#86868B]">
+                <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-medium text-foreground">
                   {ins.length} {ins.length === 1 ? 'input' : 'inputs'}
                 </span>
               )}
             </div>
 
             {ins.length === 0 ? (
-              <p className="text-sm text-[#86868B]">No inputs yet. Add one below.</p>
+              <p className="text-sm text-foreground">No inputs yet. Add one below.</p>
             ) : (
               <ul className="space-y-3">
                 {ins.map((input) => {
@@ -179,8 +183,8 @@ export default async function FlowDetailPage({
 
             {/* Add research input form */}
             <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
-              <p className="mb-5 text-sm font-semibold text-foreground">Add Research Input</p>
-              <p className="mb-5 text-sm text-[#86868B] leading-relaxed">
+              <p className="mb-3 text-sm font-semibold text-foreground">Add Research Input</p>
+              <p className="mb-5 text-sm text-foreground leading-relaxed">
                 Paste notes, a transcript, or describe a screenshot.
               </p>
               <form action={addResearchInput} className="space-y-4">
@@ -234,7 +238,7 @@ export default async function FlowDetailPage({
                 <div className="space-y-1.5">
                   <Label htmlFor="attachment" className="text-sm font-semibold text-foreground">
                     Attachment{' '}
-                    <span className="font-normal text-[#86868B]">(optional)</span>
+                    <span className="font-normal text-foreground/50">(optional)</span>
                   </Label>
                   <input
                     id="attachment"
@@ -257,14 +261,14 @@ export default async function FlowDetailPage({
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Requirements</h2>
               {reqs.length > 0 && (
-                <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-medium text-[#86868B]">
+                <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-medium text-foreground">
                   {reqs.length} {reqs.length === 1 ? 'requirement' : 'requirements'}
                 </span>
               )}
             </div>
 
             {reqs.length === 0 ? (
-              <p className="text-sm text-[#86868B]">
+              <p className="text-sm text-foreground">
                 No requirements yet. Click &ldquo;Synthesise&rdquo; on a research input to generate them.
               </p>
             ) : (
@@ -280,7 +284,7 @@ export default async function FlowDetailPage({
                       <div className="rounded-2xl bg-white p-5 shadow-sm">
                         {/* Source attribution */}
                         {sourceLabels.length > 0 && (
-                          <p className="mb-3 text-xs text-[#86868B]">
+                          <p className="mb-3 text-xs text-foreground/60">
                             From: {sourceLabels.join(', ')}
                           </p>
                         )}
@@ -318,7 +322,7 @@ export default async function FlowDetailPage({
                         <ul className="space-y-1">
                           {req.acceptance_criteria.map((criterion, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="mt-0.5 text-[#86868B]">✓</span>
+                              <span className="mt-0.5 text-foreground/40">✓</span>
                               <span>{criterion}</span>
                             </li>
                           ))}
