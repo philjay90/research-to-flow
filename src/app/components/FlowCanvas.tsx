@@ -11,7 +11,7 @@ import {
   useEdgesState,
   BaseEdge,
   EdgeLabelRenderer,
-  getSmoothStepPath,
+  getBezierPath,
   type Node,
   type Edge,
   type EdgeProps,
@@ -32,6 +32,10 @@ const DECISION_COLOR = '#CBA328'
 // Threshold: if target is this many px above source, treat as a back-edge
 const BACK_EDGE_THRESHOLD = 30
 
+// Decision node visual dimensions (must stay in sync with NODE_H_DECISION in actions/index.ts)
+const DEC_W = 200
+const DEC_H = 120
+
 interface Props {
   flowId: string
   initialNodes: FlowNode[]
@@ -51,9 +55,8 @@ function toRFNodes(nodes: FlowNode[]): Node[] {
 /**
  * Convert DB edges to React Flow edges.
  * Back-edges (target sits above source) are routed through the left/right
- * handles instead of bottom/top so they don't produce awkward downward loops.
- * All edges use the custom `labelledEdge` type so labels are rendered via
- * EdgeLabelRenderer, anchored to the top of the target node (vertical segment).
+ * handles. All edges use getBezierPath for smooth curves with no S-bends.
+ * Labels are positioned on the vertical descent via EdgeLabelRenderer.
  */
 function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
   const posMap = new Map(nodes.map((n) => [n.id, n.position_y]))
@@ -64,7 +67,6 @@ function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
     const targetY = posMap.get(e.target_node_id) ?? 0
     const sourceType = typeMap.get(e.source_node_id)
 
-    // Back-edge: target is significantly above source → route via sides
     const isBackEdge = targetY < sourceY - BACK_EDGE_THRESHOLD
     const sourceHandle = isBackEdge
       ? sourceType === 'decision' ? 'right' : 'right-out'
@@ -79,13 +81,15 @@ function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
       targetHandle,
       type: 'labelledEdge',
       label: e.label ?? undefined,
-      markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
-      style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
+      data: { isBackEdge },
+      markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR, width: 22, height: 22 },
+      style: { stroke: EDGE_COLOR, strokeWidth: 2.5 },
     }
   })
 }
 
-// ── Custom edge: label anchored to the vertical descent above the target node ─
+// ── Custom edge ───────────────────────────────────────────────────────────────
+// Uses bezier curves (no kinks) and positions labels just above the target handle.
 
 function LabelledEdge({
   id,
@@ -95,11 +99,21 @@ function LabelledEdge({
   label,
   style,
   markerEnd,
+  data,
 }: EdgeProps) {
-  const [edgePath] = getSmoothStepPath({
+  const isBackEdge = !!(data as Record<string, unknown>)?.isBackEdge
+
+  const [edgePath] = getBezierPath({
     sourceX, sourceY, sourcePosition,
     targetX, targetY, targetPosition,
+    curvature: 0.3,
   })
+
+  // Forward edges: label sits above the target handle (on the vertical descent).
+  // Back-edges: target handle is on the left side of a node — label sits to the left.
+  const labelTransform = isBackEdge
+    ? `translate(-100%, -50%) translate(${targetX - 8}px, ${targetY}px)`
+    : `translate(-50%, -100%) translate(${targetX}px, ${targetY - 10}px)`
 
   return (
     <>
@@ -109,16 +123,16 @@ function LabelledEdge({
           <div
             style={{
               position: 'absolute',
-              // Centre horizontally on the target handle; sit 10 px above it
-              transform: `translate(-50%, -100%) translate(${targetX}px, ${targetY - 10}px)`,
+              transform: labelTransform,
+              zIndex: 10000,
               pointerEvents: 'all',
               fontSize: 11,
-              fontWeight: 600,
+              fontWeight: 700,
               color: '#19323C',
               backgroundColor: '#ffffff',
               padding: '2px 8px',
               borderRadius: 4,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
               whiteSpace: 'nowrap',
             }}
             className="nodrag nopan"
@@ -135,29 +149,63 @@ function LabelledEdge({
 
 function StepNode({ data }: { data: Record<string, unknown> }) {
   return (
-    <div className="w-52 rounded-xl border-2 bg-white shadow-sm" style={{ borderColor: STEP_COLOR }}>
-      <Handle type="target" position={Position.Top} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
-      <Handle type="target" id="left-in" position={Position.Left} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
+    <div
+      style={{ width: 220, border: `2.5px solid ${STEP_COLOR}` }}
+      className="rounded-xl bg-white shadow-md"
+    >
+      <Handle type="target" position={Position.Top} style={{ background: STEP_COLOR, borderColor: '#fff', width: 10, height: 10 }} />
+      <Handle type="target" id="left-in" position={Position.Left} style={{ background: STEP_COLOR, borderColor: '#fff', width: 10, height: 10 }} />
       <div className="px-4 py-3 text-center">
-        <p className="text-xs font-medium leading-snug" style={{ color: STEP_COLOR }}>{data.label as string}</p>
+        <p className="text-xs font-semibold leading-snug" style={{ color: STEP_COLOR }}>
+          {data.label as string}
+        </p>
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
-      <Handle type="source" id="right-out" position={Position.Right} style={{ background: STEP_COLOR, borderColor: '#fff' }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: STEP_COLOR, borderColor: '#fff', width: 10, height: 10 }} />
+      <Handle type="source" id="right-out" position={Position.Right} style={{ background: STEP_COLOR, borderColor: '#fff', width: 10, height: 10 }} />
     </div>
   )
 }
 
 function DecisionNode({ data }: { data: Record<string, unknown> }) {
   return (
-    <div className="relative flex h-28 w-52 items-center justify-center">
-      <Handle type="target" position={Position.Top} style={{ top: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
-      <Handle type="target" id="left-in" position={Position.Left} style={{ left: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
-      <div className="absolute h-20 w-20 rotate-45 rounded-md border-2" style={{ borderColor: DECISION_COLOR, backgroundColor: '#FDF6DC' }} />
-      <div className="relative z-10 px-6 text-center">
-        <p className="text-xs font-medium leading-snug" style={{ color: '#19323C' }}>{data.label as string}</p>
+    <div style={{ position: 'relative', width: DEC_W, height: DEC_H }}>
+      {/* SVG diamond — vertices align exactly with handle positions */}
+      <svg
+        style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
+        width={DEC_W}
+        height={DEC_H}
+      >
+        <polygon
+          points={`${DEC_W / 2},0 ${DEC_W},${DEC_H / 2} ${DEC_W / 2},${DEC_H} 0,${DEC_H / 2}`}
+          fill="#FDF6DC"
+          stroke={DECISION_COLOR}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+        />
+      </svg>
+
+      <Handle type="target" position={Position.Top} style={{ background: DECISION_COLOR, borderColor: '#fff', zIndex: 10, width: 10, height: 10 }} />
+      <Handle type="target" id="left-in" position={Position.Left} style={{ background: DECISION_COLOR, borderColor: '#fff', zIndex: 10, width: 10, height: 10 }} />
+
+      {/* Text — constrained to the diamond's inscribed region */}
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 10,
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: `8px ${DEC_W * 0.22}px`,
+        }}
+      >
+        <p style={{ fontSize: 11, fontWeight: 600, color: '#19323C', textAlign: 'center', lineHeight: 1.35 }}>
+          {data.label as string}
+        </p>
       </div>
-      <Handle type="source" position={Position.Bottom} style={{ bottom: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
-      <Handle type="source" id="right" position={Position.Right} style={{ right: 0, background: DECISION_COLOR, borderColor: '#fff', zIndex: 10 }} />
+
+      <Handle type="source" position={Position.Bottom} style={{ background: DECISION_COLOR, borderColor: '#fff', zIndex: 10, width: 10, height: 10 }} />
+      <Handle type="source" id="right" position={Position.Right} style={{ background: DECISION_COLOR, borderColor: '#fff', zIndex: 10, width: 10, height: 10 }} />
     </div>
   )
 }
@@ -192,8 +240,9 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
             ...connection,
             id: dbId,
             type: 'labelledEdge',
-            markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
-            style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
+            data: { isBackEdge: false },
+            markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR, width: 22, height: 22 },
+            style: { stroke: EDGE_COLOR, strokeWidth: 2.5 },
           },
           eds
         )
@@ -249,11 +298,11 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
       {/* Legend */}
       <div className="absolute bottom-16 left-4 z-10 flex flex-col gap-1.5 rounded-lg border bg-white p-3 text-xs shadow-sm" style={{ color: '#19323C', borderColor: '#d1d9e0' }}>
         <div className="flex items-center gap-2">
-          <div className="h-3 w-5 rounded border-2" style={{ borderColor: STEP_COLOR, backgroundColor: '#fff' }} />
+          <div className="h-3 w-5 rounded" style={{ border: `2.5px solid ${STEP_COLOR}`, backgroundColor: '#fff' }} />
           <span>Step</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="h-3 w-3 rotate-45 rounded-sm border-2" style={{ borderColor: DECISION_COLOR, backgroundColor: '#FDF6DC' }} />
+          <div className="h-3 w-3 rotate-45 rounded-sm" style={{ border: `2.5px solid ${DECISION_COLOR}`, backgroundColor: '#FDF6DC' }} />
           <span>Decision</span>
         </div>
       </div>

@@ -8,7 +8,7 @@ import Dagre from '@dagrejs/dagre'
 
 const NODE_W = 220
 const NODE_H_STEP = 70
-const NODE_H_DECISION = 110
+const NODE_H_DECISION = 120
 
 function applyDagreLayout(
   nodes: Array<{ id: string; type: string }>,
