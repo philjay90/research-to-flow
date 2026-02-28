@@ -76,8 +76,8 @@ function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
 
       label: e.label ?? undefined,
       labelStyle: { fontSize: 11, fontWeight: 600, fill: '#19323C' },
-      labelBgStyle: { fill: '#F3F7F0', fillOpacity: 0.95 },
-      labelBgPadding: [4, 6] as [number, number],
+      labelBgStyle: { fill: '#ffffff', fillOpacity: 1 },
+      labelBgPadding: [5, 8] as [number, number],
       labelBgBorderRadius: 4,
       markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
       style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
