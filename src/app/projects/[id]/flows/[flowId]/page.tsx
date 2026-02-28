@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { addResearchInput, deleteRequirement, deleteResearchInput } from '@/app/actions'
+import { addResearchInput, deleteRequirement, deleteResearchInput, updateFlow, deleteAllInputs, deleteAllRequirements } from '@/app/actions'
 import type { Project, Flow, ResearchInput, Requirement } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/app/components/AppHeader'
 import { DeleteButton } from '@/app/components/DeleteButton'
 import { SynthesiseButton } from '@/app/components/SynthesiseButton'
+import { EditableHeader } from '@/app/components/EditableHeader'
+import { DeleteAllButton } from '@/app/components/DeleteAllButton'
 
 const INPUT_TYPE_LABELS: Record<string, string> = {
   interview_notes: 'Interview Notes',
@@ -103,13 +105,12 @@ export default async function FlowDetailPage({
       />
 
       <main className="mx-auto max-w-6xl px-8 py-12">
-        {/* Flow title + description */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{f.name}</h1>
-          {f.description && (
-            <p className="mt-3 text-base text-foreground leading-relaxed">{f.description}</p>
-          )}
-        </div>
+        {/* Editable flow title + description */}
+        <EditableHeader
+          name={f.name}
+          description={f.description}
+          onSave={updateFlow.bind(null, f.id, id)}
+        />
 
         {/* Two-column layout */}
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -179,6 +180,15 @@ export default async function FlowDetailPage({
                   )
                 })}
               </ul>
+            )}
+
+            {/* Delete all inputs */}
+            {ins.length > 0 && (
+              <DeleteAllButton
+                action={deleteAllInputs.bind(null, flowId, id)}
+                label="Delete all inputs"
+                confirmMessage="Delete ALL inputs in this flow? This cannot be undone."
+              />
             )}
 
             {/* Add research input form */}
@@ -272,6 +282,7 @@ export default async function FlowDetailPage({
                 No requirements yet. Click &ldquo;Synthesise&rdquo; on a research input to generate them.
               </p>
             ) : (
+              <>
               <ul className="space-y-4">
                 {reqs.map((req) => {
                   // Resolve source input labels for this requirement
@@ -332,6 +343,12 @@ export default async function FlowDetailPage({
                   )
                 })}
               </ul>
+              <DeleteAllButton
+                action={deleteAllRequirements.bind(null, flowId, id)}
+                label="Delete all requirements"
+                confirmMessage="Delete ALL requirements in this flow? This cannot be undone."
+              />
+              </>
             )}
           </section>
         </div>

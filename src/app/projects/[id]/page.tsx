@@ -1,11 +1,13 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { deleteFlow } from '@/app/actions'
+import { deleteFlow, updateProject, updateFlow } from '@/app/actions'
 import type { Project, Flow } from '@/types'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/app/components/AppHeader'
 import { DeleteButton } from '@/app/components/DeleteButton'
+import { EditableHeader } from '@/app/components/EditableHeader'
+import { EditableFlowCard } from '@/app/components/EditableFlowCard'
 
 export default async function ProjectPage({
   params,
@@ -49,13 +51,12 @@ export default async function ProjectPage({
       <AppHeader crumbs={[{ label: p.name }]} />
 
       <main className="mx-auto max-w-3xl px-8 py-16">
-        {/* Project title + description */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">{p.name}</h1>
-          {p.description && (
-            <p className="mt-3 text-base text-foreground leading-relaxed">{p.description}</p>
-          )}
-        </div>
+        {/* Editable project title + description */}
+        <EditableHeader
+          name={p.name}
+          description={p.description}
+          onSave={updateProject.bind(null, p.id)}
+        />
 
         {/* Flows section header */}
         <div className="mb-8 flex items-center justify-between">
@@ -79,41 +80,44 @@ export default async function ProjectPage({
               const c = countMap.get(flow.id)
               return (
                 <li key={flow.id}>
-                  <div className="group rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md">
-                    <div className="flex items-center gap-4 p-6">
-                      <Link href={`/projects/${id}/flows/${flow.id}`} className="min-w-0 flex-1">
-                        <p className="font-semibold text-foreground text-base">
-                          {flow.name}
-                        </p>
-                        {flow.description && (
-                          <p className="mt-1 text-sm text-foreground leading-relaxed">{flow.description}</p>
-                        )}
-                        <div className="mt-3 flex items-center gap-3 text-xs">
-                          <span className="rounded-full bg-[#F5F5F7] px-2.5 py-0.5 font-medium text-foreground">
-                            {c?.inputCount ?? 0} {(c?.inputCount ?? 0) === 1 ? 'input' : 'inputs'}
-                          </span>
-                          <span className="rounded-full bg-[#F5F5F7] px-2.5 py-0.5 font-medium text-foreground">
-                            {c?.reqCount ?? 0} {(c?.reqCount ?? 0) === 1 ? 'requirement' : 'requirements'}
-                          </span>
-                          <span className="text-foreground/50">
-                            {new Date(flow.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </Link>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <Button
-                          asChild size="sm" variant="outline"
-                          className="rounded-full text-xs border-[#1D1D1F] text-[#1D1D1F] hover:bg-[#1D1D1F] hover:text-white transition-colors"
-                        >
-                          <Link href={`/projects/${id}/flows/${flow.id}/canvas`}>Canvas →</Link>
-                        </Button>
-                        <DeleteButton
-                          action={deleteFlow.bind(null, flow.id, id)}
-                          confirmMessage={`Delete "${flow.name}"? This will permanently remove all inputs, requirements, and the canvas for this flow. This cannot be undone.`}
-                        />
+                  <EditableFlowCard
+                    flowId={flow.id}
+                    name={flow.name}
+                    description={flow.description}
+                    onSave={updateFlow.bind(null, flow.id, id)}
+                  >
+                    <Link href={`/projects/${id}/flows/${flow.id}`} className="block min-w-0">
+                      <p className="font-semibold text-foreground text-base">
+                        {flow.name}
+                      </p>
+                      {flow.description && (
+                        <p className="mt-1 text-sm text-foreground leading-relaxed">{flow.description}</p>
+                      )}
+                      <div className="mt-3 flex items-center gap-3 text-xs">
+                        <span className="rounded-full bg-[#F5F5F7] px-2.5 py-0.5 font-medium text-foreground">
+                          {c?.inputCount ?? 0} {(c?.inputCount ?? 0) === 1 ? 'input' : 'inputs'}
+                        </span>
+                        <span className="rounded-full bg-[#F5F5F7] px-2.5 py-0.5 font-medium text-foreground">
+                          {c?.reqCount ?? 0} {(c?.reqCount ?? 0) === 1 ? 'requirement' : 'requirements'}
+                        </span>
+                        <span className="text-foreground/50">
+                          {new Date(flow.created_at).toLocaleDateString()}
+                        </span>
                       </div>
+                    </Link>
+                    <div className="flex shrink-0 items-center gap-2 mt-4">
+                      <Button
+                        asChild size="sm" variant="outline"
+                        className="rounded-full text-xs border-[#1D1D1F] text-[#1D1D1F] hover:bg-[#1D1D1F] hover:text-white transition-colors"
+                      >
+                        <Link href={`/projects/${id}/flows/${flow.id}/canvas`}>Canvas →</Link>
+                      </Button>
+                      <DeleteButton
+                        action={deleteFlow.bind(null, flow.id, id)}
+                        confirmMessage={`Delete "${flow.name}"? This will permanently remove all inputs, requirements, and the canvas for this flow. This cannot be undone.`}
+                      />
                     </div>
-                  </div>
+                  </EditableFlowCard>
                 </li>
               )
             })}

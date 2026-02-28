@@ -59,6 +59,15 @@ export async function deleteProject(projectId: string) {
   redirect('/')
 }
 
+export async function updateProject(projectId: string, name: string, description: string | null) {
+  if (!name?.trim()) return
+  await supabase
+    .from('project')
+    .update({ name: name.trim(), description: description?.trim() || null })
+    .eq('id', projectId)
+  revalidatePath(`/projects/${projectId}`)
+}
+
 // ---------------------------------------------------------------------------
 // Flow actions
 // ---------------------------------------------------------------------------
@@ -91,6 +100,16 @@ export async function createFlow(formData: FormData) {
 export async function deleteFlow(flowId: string, projectId: string) {
   await supabase.from('flow').delete().eq('id', flowId)
   revalidatePath(`/projects/${projectId}`)
+}
+
+export async function updateFlow(flowId: string, projectId: string, name: string, description: string | null) {
+  if (!name?.trim()) return
+  await supabase
+    .from('flow')
+    .update({ name: name.trim(), description: description?.trim() || null })
+    .eq('id', flowId)
+  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -256,6 +275,16 @@ ${input.content}`,
 
 export async function deleteRequirement(requirementId: string, flowId: string, projectId: string) {
   await supabase.from('requirement').delete().eq('id', requirementId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function deleteAllInputs(flowId: string, projectId: string) {
+  await supabase.from('research_input').delete().eq('flow_id', flowId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function deleteAllRequirements(flowId: string, projectId: string) {
+  await supabase.from('requirement').delete().eq('flow_id', flowId)
   revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
