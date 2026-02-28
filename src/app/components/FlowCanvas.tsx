@@ -25,9 +25,9 @@ import { saveNodePosition, saveEdge, deleteEdge, generateFlow } from '@/app/acti
 import type { FlowNode, FlowEdge, Requirement } from '@/types'
 
 // Brand palette constants
-const EDGE_COLOR = '#19323C'
-const STEP_COLOR = '#19323C'
-const DECISION_COLOR = '#CBA328'
+const EDGE_COLOR = '#1D1D1F'
+const STEP_COLOR = '#1D1D1F'
+const DECISION_COLOR = '#C97D60'
 
 // Threshold: if target is this many px above source, treat as a back-edge
 const BACK_EDGE_THRESHOLD = 30
@@ -177,7 +177,7 @@ function DecisionNode({ data }: { data: Record<string, unknown> }) {
       >
         <polygon
           points={`${DEC_W / 2},0 ${DEC_W},${DEC_H / 2} ${DEC_W / 2},${DEC_H} 0,${DEC_H / 2}`}
-          fill="#FDF6DC"
+          fill="#FAF0EB"
           stroke={DECISION_COLOR}
           strokeWidth={2.5}
           strokeLinejoin="round"
@@ -274,8 +274,8 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
         <button
           onClick={handleGenerateFlow}
           disabled={isPending || requirements.length === 0}
-          className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium text-white shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-          style={{ backgroundColor: isPending ? '#d63558' : '#EE4266' }}
+          className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+          style={{ backgroundColor: isPending ? '#d4c900' : '#F0E100', color: '#1D1D1F' }}
         >
           {isPending ? (
             <>
@@ -291,12 +291,12 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
         </button>
         {generateError && <p className="text-xs text-red-500">{generateError}</p>}
         {requirements.length === 0 && !isPending && (
-          <p className="text-xs" style={{ color: '#7286A0' }}>Synthesise requirements first</p>
+          <p className="text-xs" style={{ color: '#86868B' }}>Synthesise requirements first</p>
         )}
       </div>
 
       {/* Legend */}
-      <div className="absolute bottom-16 left-4 z-10 flex flex-col gap-1.5 rounded-lg border bg-white p-3 text-xs shadow-sm" style={{ color: '#19323C', borderColor: '#d1d9e0' }}>
+      <div className="absolute bottom-16 left-4 z-10 flex flex-col gap-1.5 rounded-lg border bg-white p-3 text-xs shadow-sm" style={{ color: '#1D1D1F', borderColor: '#d2d2d7' }}>
         <div className="flex items-center gap-2">
           <div className="h-3 w-5 rounded" style={{ border: `2.5px solid ${STEP_COLOR}`, backgroundColor: '#fff' }} />
           <span>Step</span>
@@ -321,7 +321,7 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
         fitView
         fitViewOptions={{ padding: 0.15 }}
       >
-        <Background gap={16} color="#d1d9e0" />
+        <Background gap={16} color="#d2d2d7" />
         <Controls />
         <MiniMap
           nodeColor={(n) => (n.type === 'decisionNode' ? DECISION_COLOR : STEP_COLOR)}

@@ -28,12 +28,12 @@ const DFV_LABELS: Record<string, string> = {
 
 function statusStyle(status: string): React.CSSProperties {
   const map: Record<string, React.CSSProperties> = {
-    active:     { backgroundColor: '#EE4266', color: '#fff' },
-    draft:      { backgroundColor: '#7286A0', color: '#fff' },
-    stale:      { backgroundColor: '#CBA328', color: '#19323C' },
-    unanchored: { backgroundColor: '#fde8e8', color: '#c0392b' },
+    active:     { backgroundColor: '#F0E100', color: '#1D1D1F' },
+    draft:      { backgroundColor: '#F5F5F7', color: '#86868B' },
+    stale:      { backgroundColor: '#C97D60', color: '#ffffff' },
+    unanchored: { backgroundColor: '#FAF0EB', color: '#C97D60' },
   }
-  return map[status] ?? { backgroundColor: '#e8edf2', color: '#19323C' }
+  return map[status] ?? { backgroundColor: '#F5F5F7', color: '#1D1D1F' }
 }
 
 export default async function FlowDetailPage({
@@ -96,7 +96,7 @@ export default async function FlowDetailPage({
           { label: f.name },
         ]}
         right={
-          <Button asChild size="sm" className="bg-[#EE4266] text-white hover:bg-[#d63558] rounded-full px-5">
+          <Button asChild size="sm" className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-5 font-semibold">
             <Link href={`/projects/${id}/flows/${flowId}/canvas`}>View Canvas →</Link>
           </Button>
         }
@@ -104,7 +104,7 @@ export default async function FlowDetailPage({
 
       <main className="mx-auto max-w-6xl px-8 py-12">
         {f.description && (
-          <p className="mb-8 text-[#7286A0] leading-relaxed">{f.description}</p>
+          <p className="mb-8 text-[#86868B] leading-relaxed">{f.description}</p>
         )}
 
         {/* Two-column layout */}
@@ -115,14 +115,14 @@ export default async function FlowDetailPage({
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Inputs</h2>
               {ins.length > 0 && (
-                <span className="rounded-full bg-[#f3f7f0] px-3 py-1 text-xs font-medium text-[#7286A0]">
+                <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-medium text-[#86868B]">
                   {ins.length} {ins.length === 1 ? 'input' : 'inputs'}
                 </span>
               )}
             </div>
 
             {ins.length === 0 ? (
-              <p className="text-sm text-[#7286A0]">No inputs yet. Add one below.</p>
+              <p className="text-sm text-[#86868B]">No inputs yet. Add one below.</p>
             ) : (
               <ul className="space-y-3">
                 {ins.map((input) => {
@@ -154,7 +154,7 @@ export default async function FlowDetailPage({
 
                         {/* Type badge */}
                         <Badge
-                          style={{ backgroundColor: '#19323C', color: '#fff' }}
+                          style={{ backgroundColor: '#1D1D1F', color: '#fff' }}
                           className="mb-3 text-xs rounded-full"
                         >
                           {INPUT_TYPE_LABELS[input.type] ?? input.type}
@@ -180,7 +180,7 @@ export default async function FlowDetailPage({
             {/* Add research input form */}
             <div className="mt-6 rounded-2xl bg-white p-6 shadow-sm">
               <p className="mb-5 text-sm font-semibold text-foreground">Add Research Input</p>
-              <p className="mb-5 text-sm text-[#7286A0] leading-relaxed">
+              <p className="mb-5 text-sm text-[#86868B] leading-relaxed">
                 Paste notes, a transcript, or describe a screenshot.
               </p>
               <form action={addResearchInput} className="space-y-4">
@@ -189,13 +189,13 @@ export default async function FlowDetailPage({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="type" className="text-sm font-semibold text-foreground">
-                    Type <span className="text-[#EE4266]">*</span>
+                    Type <span className="text-[#C97D60]">*</span>
                   </Label>
                   <select
                     id="type"
                     name="type"
                     required
-                    className="block w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-[#EE4266] focus:outline-none focus:ring-1 focus:ring-[#EE4266]"
+                    className="block w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-[#1D1D1F] focus:outline-none focus:ring-1 focus:ring-[#1D1D1F]"
                   >
                     <option value="">Select a type...</option>
                     {Object.entries(INPUT_TYPE_LABELS).map(([value, label]) => (
@@ -219,7 +219,7 @@ export default async function FlowDetailPage({
 
                 <div className="space-y-1.5">
                   <Label htmlFor="content" className="text-sm font-semibold text-foreground">
-                    Content <span className="text-[#EE4266]">*</span>
+                    Content <span className="text-[#C97D60]">*</span>
                   </Label>
                   <Textarea
                     id="content"
@@ -234,18 +234,18 @@ export default async function FlowDetailPage({
                 <div className="space-y-1.5">
                   <Label htmlFor="attachment" className="text-sm font-semibold text-foreground">
                     Attachment{' '}
-                    <span className="font-normal text-[#7286A0]">(optional)</span>
+                    <span className="font-normal text-[#86868B]">(optional)</span>
                   </Label>
                   <input
                     id="attachment"
                     name="attachment"
                     type="file"
                     accept="image/*,.pdf"
-                    className="block w-full text-sm text-foreground file:mr-3 file:rounded-full file:border-0 file:bg-[#19323C] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-[#19323C]/90"
+                    className="block w-full text-sm text-foreground file:mr-3 file:rounded-full file:border-0 file:bg-[#1D1D1F] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-[#1D1D1F]/80"
                   />
                 </div>
 
-                <Button type="submit" className="bg-[#EE4266] text-white hover:bg-[#d63558] rounded-full px-6">
+                <Button type="submit" className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 font-semibold">
                   Add Input
                 </Button>
               </form>
@@ -257,14 +257,14 @@ export default async function FlowDetailPage({
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-2xl font-bold tracking-tight text-foreground">Requirements</h2>
               {reqs.length > 0 && (
-                <span className="rounded-full bg-[#f3f7f0] px-3 py-1 text-xs font-medium text-[#7286A0]">
+                <span className="rounded-full bg-[#F5F5F7] px-3 py-1 text-xs font-medium text-[#86868B]">
                   {reqs.length} {reqs.length === 1 ? 'requirement' : 'requirements'}
                 </span>
               )}
             </div>
 
             {reqs.length === 0 ? (
-              <p className="text-sm text-[#7286A0]">
+              <p className="text-sm text-[#86868B]">
                 No requirements yet. Click &ldquo;Synthesise&rdquo; on a research input to generate them.
               </p>
             ) : (
@@ -280,7 +280,7 @@ export default async function FlowDetailPage({
                       <div className="rounded-2xl bg-white p-5 shadow-sm">
                         {/* Source attribution */}
                         {sourceLabels.length > 0 && (
-                          <p className="mb-3 text-xs text-[#7286A0]">
+                          <p className="mb-3 text-xs text-[#86868B]">
                             From: {sourceLabels.join(', ')}
                           </p>
                         )}
@@ -303,7 +303,7 @@ export default async function FlowDetailPage({
                           </Badge>
                           {req.dfv_tag && (
                             <Badge
-                              style={{ backgroundColor: '#CBA328', color: '#19323C' }}
+                              style={{ backgroundColor: '#C97D60', color: '#ffffff' }}
                               className="text-xs font-medium rounded-full"
                             >
                               {DFV_LABELS[req.dfv_tag] ?? req.dfv_tag}
@@ -318,7 +318,7 @@ export default async function FlowDetailPage({
                         <ul className="space-y-1">
                           {req.acceptance_criteria.map((criterion, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="mt-0.5 text-[#7286A0]">✓</span>
+                              <span className="mt-0.5 text-[#86868B]">✓</span>
                               <span>{criterion}</span>
                             </li>
                           ))}

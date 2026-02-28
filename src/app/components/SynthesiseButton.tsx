@@ -53,10 +53,10 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
         size="sm"
         onClick={handleClick}
         disabled={isPending}
-        className={`h-7 text-xs ${
+        className={`h-7 text-xs rounded-full ${
           isModified
-            ? 'border-[#CBA328] text-[#CBA328] hover:bg-[#CBA328]/10'
-            : 'border-[#EE4266] text-[#EE4266] hover:bg-[#EE4266]/10'
+            ? 'border-[#C97D60] text-[#C97D60] hover:bg-[#C97D60]/10'
+            : 'border-[#1D1D1F] text-[#1D1D1F] hover:bg-[#1D1D1F]/10'
         }`}
       >
         {isPending ? '…' : isModified ? 'Re-synthesise' : 'Synthesise'}
@@ -69,17 +69,17 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
           onClick={() => setShowDialog(false)}
         >
           <div
-            className="w-80 rounded-xl bg-white p-6 shadow-xl"
+            className="w-80 rounded-2xl bg-white p-6 shadow-xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-2 font-semibold text-foreground">Re-synthesise this input?</h3>
-            <p className="mb-5 text-sm text-[#7286A0]">
+            <p className="mb-5 text-sm text-[#86868B]">
               This input already has requirements generated from it. What would you like to do with the existing ones?
             </p>
             <div className="flex flex-col gap-2">
               <Button
                 onClick={() => { setShowDialog(false); run('replace') }}
-                className="w-full bg-[#EE4266] text-white hover:bg-[#d63558]"
+                className="w-full bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full"
                 size="sm"
               >
                 Replace — delete old &amp; generate fresh
@@ -88,7 +88,7 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
                 onClick={() => { setShowDialog(false); run('append') }}
                 variant="outline"
                 size="sm"
-                className="w-full"
+                className="w-full rounded-full"
               >
                 Append — keep old &amp; add new
               </Button>
@@ -96,7 +96,7 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
                 onClick={() => setShowDialog(false)}
                 variant="ghost"
                 size="sm"
-                className="w-full text-[#7286A0]"
+                className="w-full text-[#86868B] rounded-full"
               >
                 Cancel
               </Button>

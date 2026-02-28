@@ -34,7 +34,7 @@ export function DeleteButton({
       size="icon"
       onClick={handleClick}
       disabled={isPending}
-      className={className ?? 'h-7 w-7 text-[#7286A0] hover:text-red-500 hover:bg-red-50'}
+      className={className ?? 'h-7 w-7 text-[#86868B] hover:text-red-500 hover:bg-red-50'}
       aria-label="Delete"
     >
       {isPending

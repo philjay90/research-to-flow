@@ -50,24 +50,24 @@
 :root {
   --radius: 0.625rem;
   /* ── Brand palette ── */
-  --background: #F3F7F0;       /* Mint Cream  */
-  --foreground: #19323C;       /* Jet Black   */
+  --background: #F5F5F7;       /* Platinum     */
+  --foreground: #1D1D1F;       /* Carbon Black */
   --card: #ffffff;
-  --card-foreground: #19323C;
+  --card-foreground: #1D1D1F;
   --popover: #ffffff;
-  --popover-foreground: #19323C;
-  --primary: #EE4266;          /* Watermelon  */
-  --primary-foreground: #ffffff;
-  --secondary: #7286A0;        /* Slate Grey  */
+  --popover-foreground: #1D1D1F;
+  --primary: #F0E100;          /* Bright Lemon */
+  --primary-foreground: #1D1D1F;
+  --secondary: #1D1D1F;        /* Carbon Black */
   --secondary-foreground: #ffffff;
-  --muted: #e8edf2;
-  --muted-foreground: #7286A0;
-  --accent: #CBA328;           /* Golden Bronze */
-  --accent-foreground: #19323C;
+  --muted: #F5F5F7;
+  --muted-foreground: #86868B;
+  --accent: #C97D60;           /* Burnt Peach  */
+  --accent-foreground: #ffffff;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #d1d9e0;
-  --input: #d1d9e0;
-  --ring: #EE4266;
+  --border: #d2d2d7;
+  --input: #d2d2d7;
+  --ring: #1D1D1F;
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);

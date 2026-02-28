@@ -13,7 +13,7 @@ interface AppHeaderProps {
 
 export function AppHeader({ crumbs = [], right }: AppHeaderProps) {
   return (
-    <header className="flex items-center justify-between bg-[#19323C] px-8 py-4 border-b border-white/10">
+    <header className="flex items-center justify-between bg-[#1D1D1F] px-8 py-4 border-b border-white/10">
       <nav className="flex items-center gap-2 text-sm">
         <Link
           href="/"
