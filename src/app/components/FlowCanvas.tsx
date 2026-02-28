@@ -112,7 +112,7 @@ function LabelledEdge({
   // Forward edges: label sits above the target handle (on the vertical descent).
   // Back-edges: target handle is on the left side of a node — label sits to the left.
   const labelTransform = isBackEdge
-    ? `translate(-100%, -50%) translate(${targetX - 8}px, ${targetY}px)`
+    ? `translate(0%, -50%) translate(${sourceX + 16}px, ${sourceY}px)`
     : `translate(-50%, -100%) translate(${targetX}px, ${targetY - 36}px)`
 
   return (
