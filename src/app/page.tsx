@@ -22,8 +22,8 @@ export default async function HomePage() {
       <main className="mx-auto max-w-3xl px-8 py-16">
         <div className="mb-10 flex items-end justify-between">
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>
-          <Button asChild className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-5 font-semibold">
-            <Link href="/projects/new">+ New Project</Link>
+          <Button asChild className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full h-10 w-10 text-2xl font-light flex items-center justify-center p-0">
+            <Link href="/projects/new">+</Link>
           </Button>
         </div>
 
