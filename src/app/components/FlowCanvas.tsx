@@ -113,7 +113,7 @@ function LabelledEdge({
   // Back-edges: target handle is on the left side of a node — label sits to the left.
   const labelTransform = isBackEdge
     ? `translate(-100%, -50%) translate(${targetX - 8}px, ${targetY}px)`
-    : `translate(-50%, -100%) translate(${targetX}px, ${targetY - 10}px)`
+    : `translate(-50%, -100%) translate(${targetX}px, ${targetY - 36}px)`
 
   return (
     <>
