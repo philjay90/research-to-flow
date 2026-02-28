@@ -21,10 +21,7 @@ export default async function HomePage() {
       <AppHeader />
       <main className="mx-auto max-w-3xl px-8 py-16">
         <div className="mb-10 flex items-end justify-between">
-          <div>
-            <p className="mb-1 text-sm font-medium text-foreground">Your workspaces</p>
-            <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>
-          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>
           <Button asChild className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-5 font-semibold">
             <Link href="/projects/new">+ New Project</Link>
           </Button>
