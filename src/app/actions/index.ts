@@ -332,3 +332,18 @@ export async function saveEdge(projectId: string, sourceNodeId: string, targetNo
 export async function deleteEdge(edgeId: string) {
   await supabase.from('flow_edge').delete().eq('id', edgeId)
 }
+
+export async function deleteProject(projectId: string) {
+  await supabase.from('project').delete().eq('id', projectId)
+  redirect('/')
+}
+
+export async function deleteRequirement(requirementId: string, projectId: string) {
+  await supabase.from('requirement').delete().eq('id', requirementId)
+  revalidatePath(`/projects/${projectId}`)
+}
+
+export async function deleteResearchInput(inputId: string, projectId: string) {
+  await supabase.from('research_input').delete().eq('id', inputId)
+  revalidatePath(`/projects/${projectId}`)
+}
