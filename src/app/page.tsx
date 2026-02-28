@@ -60,7 +60,6 @@ export default async function HomePage() {
                       <DeleteButton
                         action={deleteProject.bind(null, project.id)}
                         confirmMessage={`Delete "${project.name}"? This will permanently remove all research inputs, requirements, and the flow. This cannot be undone.`}
-                        label="Delete"
                       />
                     </div>
                   </CardContent>

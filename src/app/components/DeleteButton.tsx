@@ -2,19 +2,18 @@
 
 import { useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface DeleteButtonProps {
   action: () => Promise<void>
   confirmMessage: string
-  label?: string
   className?: string
 }
 
 export function DeleteButton({
   action,
   confirmMessage,
-  label = 'Delete',
   className,
 }: DeleteButtonProps) {
   const [isPending, startTransition] = useTransition()
@@ -32,12 +31,16 @@ export function DeleteButton({
     <Button
       type="button"
       variant="ghost"
-      size="sm"
+      size="icon"
       onClick={handleClick}
       disabled={isPending}
-      className={className ?? 'h-7 text-xs text-[#7286A0] hover:text-red-500 hover:bg-red-50'}
+      className={className ?? 'h-7 w-7 text-[#7286A0] hover:text-red-500 hover:bg-red-50'}
+      aria-label="Delete"
     >
-      {isPending ? '…' : label}
+      {isPending
+        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+        : <Trash2 className="h-3.5 w-3.5" />
+      }
     </Button>
   )
 }
