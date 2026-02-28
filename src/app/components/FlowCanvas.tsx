@@ -9,8 +9,12 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getSmoothStepPath,
   type Node,
   type Edge,
+  type EdgeProps,
   type OnConnect,
   MarkerType,
   Handle,
@@ -48,7 +52,8 @@ function toRFNodes(nodes: FlowNode[]): Node[] {
  * Convert DB edges to React Flow edges.
  * Back-edges (target sits above source) are routed through the left/right
  * handles instead of bottom/top so they don't produce awkward downward loops.
- * All edges use `smoothstep` for clean orthogonal routing.
+ * All edges use the custom `labelledEdge` type so labels are rendered via
+ * EdgeLabelRenderer, anchored to the top of the target node (vertical segment).
  */
 function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
   const posMap = new Map(nodes.map((n) => [n.id, n.position_y]))
@@ -72,17 +77,58 @@ function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
       target: e.target_node_id,
       sourceHandle,
       targetHandle,
-      type: 'smoothstep',
-
+      type: 'labelledEdge',
       label: e.label ?? undefined,
-      labelStyle: { fontSize: 11, fontWeight: 600, fill: '#19323C' },
-      labelBgStyle: { fill: '#ffffff', fillOpacity: 1 },
-      labelBgPadding: [5, 8] as [number, number],
-      labelBgBorderRadius: 4,
       markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
       style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
     }
   })
+}
+
+// ── Custom edge: label anchored to the vertical descent above the target node ─
+
+function LabelledEdge({
+  id,
+  sourceX, sourceY,
+  targetX, targetY,
+  sourcePosition, targetPosition,
+  label,
+  style,
+  markerEnd,
+}: EdgeProps) {
+  const [edgePath] = getSmoothStepPath({
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+  })
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      {label && (
+        <EdgeLabelRenderer>
+          <div
+            style={{
+              position: 'absolute',
+              // Centre horizontally on the target handle; sit 10 px above it
+              transform: `translate(-50%, -100%) translate(${targetX}px, ${targetY - 10}px)`,
+              pointerEvents: 'all',
+              fontSize: 11,
+              fontWeight: 600,
+              color: '#19323C',
+              backgroundColor: '#ffffff',
+              padding: '2px 8px',
+              borderRadius: 4,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+              whiteSpace: 'nowrap',
+            }}
+            className="nodrag nopan"
+          >
+            {label as string}
+          </div>
+        </EdgeLabelRenderer>
+      )}
+    </>
+  )
 }
 
 // ── Node components ──────────────────────────────────────────────────────────
@@ -117,6 +163,7 @@ function DecisionNode({ data }: { data: Record<string, unknown> }) {
 }
 
 const nodeTypes = { stepNode: StepNode, decisionNode: DecisionNode }
+const edgeTypes = { labelledEdge: LabelledEdge }
 
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
@@ -144,8 +191,7 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
           {
             ...connection,
             id: dbId,
-            type: 'smoothstep',
-      
+            type: 'labelledEdge',
             markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR },
             style: { stroke: EDGE_COLOR, strokeWidth: 1.5 },
           },
@@ -221,7 +267,8 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
         onEdgesDelete={onEdgesDelete}
         onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
-        defaultEdgeOptions={{ type: 'smoothstep' }}
+        edgeTypes={edgeTypes}
+        defaultEdgeOptions={{ type: 'labelledEdge' }}
         fitView
         fitViewOptions={{ padding: 0.15 }}
       >
