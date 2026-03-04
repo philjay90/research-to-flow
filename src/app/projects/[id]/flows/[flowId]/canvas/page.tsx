@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import FlowCanvas from '@/app/components/FlowCanvas'
 import { AppHeader } from '@/app/components/AppHeader'
 import type { Project, Flow, FlowNode, FlowEdge, Requirement } from '@/types'
@@ -10,6 +10,7 @@ export default async function CanvasPage({
   params: Promise<{ id: string; flowId: string }>
 }) {
   const { id, flowId } = await params
+  const supabase = await createClient()
 
   const [
     { data: project, error: projectError },

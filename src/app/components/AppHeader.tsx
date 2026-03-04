@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { signOut } from '@/app/actions'
 
 interface Crumb {
   label: string
@@ -34,7 +35,17 @@ export function AppHeader({ crumbs = [], right }: AppHeaderProps) {
           </span>
         ))}
       </nav>
-      {right && <div>{right}</div>}
+      <div className="flex items-center gap-4">
+        {right && <div>{right}</div>}
+        <form action={signOut}>
+          <button
+            type="submit"
+            className="text-xs text-white/40 hover:text-white/80 transition-colors"
+          >
+            Sign out
+          </button>
+        </form>
+      </div>
     </header>
   )
 }

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import type { Project } from '@/types'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/app/components/AppHeader'
@@ -7,6 +7,7 @@ import { DeleteButton } from '@/app/components/DeleteButton'
 import { deleteProject } from '@/app/actions'
 
 export default async function HomePage() {
+  const supabase = await createClient()
   const { data: projects, error } = await supabase
     .from('project')
     .select('*')

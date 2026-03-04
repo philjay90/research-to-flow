@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { addResearchInput, deleteRequirement, deleteResearchInput, updateFlow, deleteAllInputs, deleteAllRequirements } from '@/app/actions'
 import type { Project, Flow, ResearchInput, Requirement } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -27,6 +27,7 @@ export default async function FlowDetailPage({
   params: Promise<{ id: string; flowId: string }>
 }) {
   const { id, flowId } = await params
+  const supabase = await createClient()
 
   const [
     { data: project, error: projectError },

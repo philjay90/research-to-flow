@@ -2,13 +2,23 @@
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { createClient } from '@/lib/supabase'
 import { anthropic } from '@/lib/anthropic'
 import Dagre from '@dagrejs/dagre'
 
 const NODE_W = 220
 const NODE_H_STEP = 70
 const NODE_H_DECISION = 120
+
+// ---------------------------------------------------------------------------
+// Auth helper
+// ---------------------------------------------------------------------------
+
+async function getClientAndUser() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  return { supabase, user }
+}
 
 function applyDagreLayout(
   nodes: Array<{ id: string; type: string }>,
@@ -31,10 +41,23 @@ function applyDagreLayout(
 }
 
 // ---------------------------------------------------------------------------
+// Auth actions
+// ---------------------------------------------------------------------------
+
+export async function signOut() {
+  const supabase = await createClient()
+  await supabase.auth.signOut()
+  redirect('/login')
+}
+
+// ---------------------------------------------------------------------------
 // Project actions
 // ---------------------------------------------------------------------------
 
 export async function createProject(formData: FormData) {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return
+
   const name = formData.get('name') as string
   const description = formData.get('description') as string
 
@@ -42,7 +65,7 @@ export async function createProject(formData: FormData) {
 
   const { data, error } = await supabase
     .from('project')
-    .insert({ name: name.trim(), description: description?.trim() || null })
+    .insert({ name: name.trim(), description: description?.trim() || null, user_id: user.id })
     .select('id')
     .single()
 
@@ -55,12 +78,14 @@ export async function createProject(formData: FormData) {
 }
 
 export async function deleteProject(projectId: string) {
+  const { supabase } = await getClientAndUser()
   await supabase.from('project').delete().eq('id', projectId)
   redirect('/')
 }
 
 export async function updateProject(projectId: string, name: string, description: string | null) {
   if (!name?.trim()) return
+  const { supabase } = await getClientAndUser()
   await supabase
     .from('project')
     .update({ name: name.trim(), description: description?.trim() || null })
@@ -73,6 +98,9 @@ export async function updateProject(projectId: string, name: string, description
 // ---------------------------------------------------------------------------
 
 export async function createFlow(formData: FormData) {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return
+
   const projectId = formData.get('project_id') as string
   const name = formData.get('name') as string
   const description = formData.get('description') as string
@@ -85,6 +113,7 @@ export async function createFlow(formData: FormData) {
       project_id: projectId,
       name: name.trim(),
       description: description?.trim() || null,
+      user_id: user.id,
     })
     .select('id')
     .single()
@@ -98,12 +127,14 @@ export async function createFlow(formData: FormData) {
 }
 
 export async function deleteFlow(flowId: string, projectId: string) {
+  const { supabase } = await getClientAndUser()
   await supabase.from('flow').delete().eq('id', flowId)
   revalidatePath(`/projects/${projectId}`)
 }
 
 export async function updateFlow(flowId: string, projectId: string, name: string, description: string | null) {
   if (!name?.trim()) return
+  const { supabase } = await getClientAndUser()
   await supabase
     .from('flow')
     .update({ name: name.trim(), description: description?.trim() || null })
@@ -117,6 +148,9 @@ export async function updateFlow(flowId: string, projectId: string, name: string
 // ---------------------------------------------------------------------------
 
 export async function addResearchInput(formData: FormData) {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return
+
   const projectId = formData.get('project_id') as string
   const flowId = formData.get('flow_id') as string
   const type = formData.get('type') as string
@@ -154,6 +188,7 @@ export async function addResearchInput(formData: FormData) {
     content: content.trim(),
     source_label: sourceLabel?.trim() || null,
     attachment_url: attachmentUrl,
+    user_id: user.id,
   })
 
   if (error) {
@@ -165,7 +200,33 @@ export async function addResearchInput(formData: FormData) {
 }
 
 export async function deleteResearchInput(inputId: string, flowId: string, projectId: string) {
+  const { supabase } = await getClientAndUser()
   await supabase.from('research_input').delete().eq('id', inputId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function updateResearchInput(
+  inputId: string,
+  flowId: string,
+  projectId: string,
+  data: { type: string; source_label: string | null; content: string }
+) {
+  if (!data.content?.trim()) return
+  const { supabase } = await getClientAndUser()
+  await supabase
+    .from('research_input')
+    .update({
+      type: data.type,
+      source_label: data.source_label?.trim() || null,
+      content: data.content.trim(),
+    })
+    .eq('id', inputId)
+  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function deleteAllInputs(flowId: string, projectId: string) {
+  const { supabase } = await getClientAndUser()
+  await supabase.from('research_input').delete().eq('flow_id', flowId)
   revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
@@ -179,9 +240,9 @@ export async function synthesiseInput(
   projectId: string,
   mode: 'append' | 'replace' = 'append'
 ) {
-  if (!inputId || !flowId || !projectId) return
+  const { supabase, user } = await getClientAndUser()
+  if (!user || !inputId || !flowId || !projectId) return
 
-  // Replace mode: delete requirements previously generated from this input
   if (mode === 'replace') {
     const { data: existingReqs } = await supabase
       .from('requirement')
@@ -261,6 +322,7 @@ ${input.content}`,
     acceptance_criteria: req.acceptance_criteria,
     dfv_tag: req.dfv_tag ?? null,
     status: 'draft',
+    user_id: user.id,
   }))
 
   const { error: insertError } = await supabase.from('requirement').insert(rows)
@@ -274,30 +336,8 @@ ${input.content}`,
 }
 
 export async function deleteRequirement(requirementId: string, flowId: string, projectId: string) {
+  const { supabase } = await getClientAndUser()
   await supabase.from('requirement').delete().eq('id', requirementId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
-}
-
-export async function updateResearchInput(
-  inputId: string,
-  flowId: string,
-  projectId: string,
-  data: { type: string; source_label: string | null; content: string }
-) {
-  if (!data.content?.trim()) return
-  await supabase
-    .from('research_input')
-    .update({
-      type: data.type,
-      source_label: data.source_label?.trim() || null,
-      content: data.content.trim(),
-    })
-    .eq('id', inputId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
-}
-
-export async function deleteAllInputs(flowId: string, projectId: string) {
-  await supabase.from('research_input').delete().eq('flow_id', flowId)
   revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
@@ -313,6 +353,7 @@ export async function updateRequirement(
   }
 ) {
   if (!data.user_story?.trim()) return
+  const { supabase } = await getClientAndUser()
   await supabase
     .from('requirement')
     .update({
@@ -327,6 +368,7 @@ export async function updateRequirement(
 }
 
 export async function deleteAllRequirements(flowId: string, projectId: string) {
+  const { supabase } = await getClientAndUser()
   await supabase.from('requirement').delete().eq('flow_id', flowId)
   revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
@@ -335,10 +377,10 @@ export async function deleteAllRequirements(flowId: string, projectId: string) {
 // Canvas actions
 // ---------------------------------------------------------------------------
 
-// generateFlow: asks Claude to interpret all requirements for a flow and produce
-// an optimal task-flow map. Clears existing nodes/edges first, then saves fresh.
 export async function generateFlow(flowId: string) {
-  // Fetch all requirements for this flow
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return { error: 'Not authenticated' }
+
   const { data: requirements } = await supabase
     .from('requirement')
     .select('business_opportunity, user_story, acceptance_criteria, dfv_tag')
@@ -346,7 +388,6 @@ export async function generateFlow(flowId: string) {
 
   if (!requirements || requirements.length === 0) return { error: 'No requirements to generate from' }
 
-  // Fetch the flow to get project_id
   const { data: flow } = await supabase.from('flow').select('project_id').eq('id', flowId).single()
   if (!flow) return { error: 'Flow not found' }
 
@@ -421,15 +462,12 @@ ${requirementsSummary}`,
     return { error: 'Failed to parse flow from Claude' }
   }
 
-  // Compute clean layout with dagre — ignore any coordinates from Claude
   const positions = applyDagreLayout(flowData.nodes, flowData.edges)
 
-  // Clear existing flow data for this flow
   await supabase.from('flow_edge').delete().eq('flow_id', flowId)
   await supabase.from('flow_node').delete().eq('flow_id', flowId)
 
-  // Insert new nodes and collect their real DB IDs
-  const nodeIdMap = new Map<string, string>() // tempId → real UUID
+  const nodeIdMap = new Map<string, string>()
 
   for (const node of flowData.nodes) {
     const pos = positions.get(node.id) ?? { x: 0, y: 0 }
@@ -443,6 +481,7 @@ ${requirementsSummary}`,
         label: node.label,
         position_x: pos.x,
         position_y: pos.y,
+        user_id: user.id,
       })
       .select('id')
       .single()
@@ -452,7 +491,6 @@ ${requirementsSummary}`,
     }
   }
 
-  // Insert edges using real UUIDs
   const edgeRows = flowData.edges
     .map((e) => {
       const sourceId = nodeIdMap.get(e.source)
@@ -464,6 +502,7 @@ ${requirementsSummary}`,
         source_node_id: sourceId,
         target_node_id: targetId,
         label: e.label ?? null,
+        user_id: user.id,
       }
     })
     .filter(Boolean)
@@ -476,6 +515,7 @@ ${requirementsSummary}`,
 }
 
 export async function saveNodePosition(nodeId: string, x: number, y: number) {
+  const { supabase } = await getClientAndUser()
   await supabase
     .from('flow_node')
     .update({ position_x: x, position_y: y })
@@ -483,7 +523,9 @@ export async function saveNodePosition(nodeId: string, x: number, y: number) {
 }
 
 export async function saveEdge(flowId: string, sourceNodeId: string, targetNodeId: string) {
-  // Fetch flow to get project_id
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return null
+
   const { data: flow } = await supabase.from('flow').select('project_id').eq('id', flowId).single()
   if (!flow) return null
 
@@ -494,6 +536,7 @@ export async function saveEdge(flowId: string, sourceNodeId: string, targetNodeI
       flow_id: flowId,
       source_node_id: sourceNodeId,
       target_node_id: targetNodeId,
+      user_id: user.id,
     })
     .select('id')
     .single()
@@ -506,5 +549,6 @@ export async function saveEdge(flowId: string, sourceNodeId: string, targetNodeI
 }
 
 export async function deleteEdge(edgeId: string) {
+  const { supabase } = await getClientAndUser()
   await supabase.from('flow_edge').delete().eq('id', edgeId)
 }
