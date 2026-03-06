@@ -121,8 +121,20 @@ function EditableField({
             </button>
           </div>
         </div>
+      ) : multiline ? (
+        <ul className="space-y-1.5">
+          {value
+            .split('\n')
+            .filter((line) => line.trim())
+            .map((line, i) => (
+              <li key={i} className="flex items-start gap-2 text-sm text-[#1D1D1F] leading-relaxed">
+                <span className="mt-[5px] h-1.5 w-1.5 flex-shrink-0 rounded-full bg-[#1D1D1F]/40" />
+                <span>{line.replace(/^[-•*]\s*/, '')}</span>
+              </li>
+            ))}
+        </ul>
       ) : (
-        <p className="text-sm text-[#1D1D1F] leading-relaxed whitespace-pre-wrap">{value}</p>
+        <p className="text-sm text-[#1D1D1F] leading-relaxed">{value}</p>
       )}
     </div>
   )

@@ -41,6 +41,7 @@ interface Props {
   initialNodes: FlowNode[]
   initialEdges: FlowEdge[]
   requirements: Requirement[]
+  personas: { id: string; name: string }[]
 }
 
 function toRFNodes(nodes: FlowNode[]): Node[] {
@@ -215,11 +216,12 @@ const edgeTypes = { labelledEdge: LabelledEdge }
 
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
-export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements }: Props) {
+export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements, personas }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(toRFNodes(initialNodes))
   const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(initialEdges, initialNodes))
   const [isPending, startTransition] = useTransition()
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
@@ -258,7 +260,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
   const handleGenerateFlow = () => {
     setGenerateError(null)
     startTransition(async () => {
-      const result = await generateFlow(projectId)
+      const result = await generateFlow(projectId, selectedPersonaId || null)
       if (result?.error) {
         setGenerateError(result.error)
         return
@@ -269,26 +271,42 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
 
   return (
     <div className="relative h-full w-full">
-      {/* Generate Flow button */}
+      {/* Generate Flow button + persona selector */}
       <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 flex flex-col items-center gap-2">
-        <button
-          onClick={handleGenerateFlow}
-          disabled={isPending || requirements.length === 0}
-          className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-          style={{ backgroundColor: isPending ? '#d4c900' : '#F0E100', color: '#1D1D1F' }}
-        >
-          {isPending ? (
-            <>
-              <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-              </svg>
-              Generating…
-            </>
-          ) : (
-            '✦ Generate Flow'
+        <div className="flex items-center gap-2">
+          {/* Persona selector */}
+          {personas.length > 0 && (
+            <select
+              value={selectedPersonaId}
+              onChange={(e) => setSelectedPersonaId(e.target.value)}
+              disabled={isPending}
+              className="rounded-full border border-[#D2D2D7] bg-white px-3 py-2 text-sm text-[#1D1D1F] shadow-md focus:border-[#1D1D1F] focus:outline-none disabled:opacity-60"
+            >
+              <option value="">All requirements</option>
+              {personas.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
           )}
-        </button>
+          <button
+            onClick={handleGenerateFlow}
+            disabled={isPending || requirements.length === 0}
+            className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-60"
+            style={{ backgroundColor: isPending ? '#d4c900' : '#F0E100', color: '#1D1D1F' }}
+          >
+            {isPending ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+                </svg>
+                Generating…
+              </>
+            ) : (
+              '✦ Generate Flow'
+            )}
+          </button>
+        </div>
         {generateError && <p className="text-xs text-red-500">{generateError}</p>}
         {requirements.length === 0 && !isPending && (
           <p className="text-xs" style={{ color: '#86868B' }}>Synthesise requirements first</p>

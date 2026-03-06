@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { FlowNode, FlowEdge, Requirement } from '@/types'
+import type { FlowNode, FlowEdge, Requirement, Persona } from '@/types'
 import { AppHeader } from '@/app/components/AppHeader'
 import FlowCanvas from '@/app/components/FlowCanvas'
 
@@ -20,7 +20,7 @@ export default async function CanvasPage({
 
   if (projectError || !project) notFound()
 
-  const [{ data: nodes }, { data: edges }, { data: requirements }] = await Promise.all([
+  const [{ data: nodes }, { data: edges }, { data: requirements }, { data: personas }] = await Promise.all([
     supabase
       .from('flow_node')
       .select('*')
@@ -35,6 +35,11 @@ export default async function CanvasPage({
       .from('requirement')
       .select('*')
       .eq('project_id', id),
+    supabase
+      .from('persona')
+      .select('id, name')
+      .eq('project_id', id)
+      .order('created_at', { ascending: true }),
   ])
 
   return (
@@ -56,6 +61,7 @@ export default async function CanvasPage({
           initialNodes={(nodes ?? []) as FlowNode[]}
           initialEdges={(edges ?? []) as FlowEdge[]}
           requirements={(requirements ?? []) as Requirement[]}
+          personas={(personas ?? []) as Pick<Persona, 'id' | 'name'>[]}
         />
       </div>
     </>

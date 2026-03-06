@@ -414,16 +414,54 @@ export async function deleteAllRequirements(projectId: string) {
 // Canvas actions
 // ---------------------------------------------------------------------------
 
-export async function generateFlow(projectId: string) {
+export async function generateFlow(projectId: string, personaId?: string | null) {
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
 
-  const { data: requirements } = await supabase
+  // If a persona is selected, fetch only requirements linked to that persona
+  let requirementsQuery = supabase
     .from('requirement')
     .select('business_opportunity, user_story, acceptance_criteria, dfv_tag')
     .eq('project_id', projectId)
 
+  if (personaId) {
+    const { data: linkedReqs } = await supabase
+      .from('persona_requirement')
+      .select('requirement_id')
+      .eq('persona_id', personaId)
+
+    const linkedIds = (linkedReqs ?? []).map((r: { requirement_id: string }) => r.requirement_id)
+    if (linkedIds.length > 0) {
+      requirementsQuery = requirementsQuery.in('id', linkedIds)
+    } else {
+      return { error: 'This persona has no linked requirements. Link some requirements first.' }
+    }
+  }
+
+  const { data: requirements } = await requirementsQuery
+
   if (!requirements || requirements.length === 0) return { error: 'No requirements to generate from' }
+
+  // Fetch persona context if selected
+  let personaContext = ''
+  if (personaId) {
+    const { data: persona } = await supabase
+      .from('persona')
+      .select('name, role_title, background, macro_goals, pain_points')
+      .eq('id', personaId)
+      .single()
+
+    if (persona) {
+      personaContext = `\nPERSONA CONTEXT:
+Name: ${persona.name}
+Role: ${persona.role_title}
+Background: ${persona.background}
+Goals: ${persona.macro_goals}
+Pain points: ${persona.pain_points}
+
+Design the flow specifically for this persona.\n`
+    }
+  }
 
   const requirementsSummary = requirements
     .map((r: { business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null }, i: number) =>
@@ -442,7 +480,7 @@ export async function generateFlow(projectId: string) {
       {
         role: 'user',
         content: `You are a UX/product designer creating a task-flow diagram from a set of product requirements.
-
+${personaContext}
 Given the requirements below, design an optimal end-to-end task flow that a user would follow to accomplish their goals. The flow should represent the actual steps a user takes through the product — not the requirements themselves.
 
 Rules:
@@ -675,16 +713,18 @@ RULES:
 - source_input_ids: list the Input IDs that informed this persona
 - requirement_ids: list Requirement IDs most relevant to this persona
 
+For multiline fields (background, tools, macro_goals, tasks_activities, pain_points), write each distinct point or item on its own line. Do not use bullet characters, hyphens, or numbers — just plain text lines separated by \\n.
+
 Return ONLY a JSON array. No explanation, no markdown, no code fences. Each element must have this exact shape:
 {
   "existing_persona_id": "uuid-or-null",
   "name": "First name or persona name",
   "role_title": "Job title or role",
-  "background": "2-3 sentences about their background and context",
-  "tools": "Tools, platforms, and systems they use",
-  "macro_goals": "Their overarching goals and motivations",
-  "tasks_activities": "Day-to-day tasks and activities",
-  "pain_points": "Frustrations, blockers, and challenges",
+  "background": "Line 1 about background\\nLine 2 about background",
+  "tools": "Tool A\\nTool B\\nTool C",
+  "macro_goals": "Goal 1\\nGoal 2",
+  "tasks_activities": "Task 1\\nTask 2\\nTask 3",
+  "pain_points": "Pain point 1\\nPain point 2",
   "source_input_ids": ["input-id-1"],
   "requirement_ids": ["req-id-1"],
   "field_provenance": {
