@@ -37,7 +37,7 @@ const DEC_W = 200
 const DEC_H = 120
 
 interface Props {
-  flowId: string
+  projectId: string
   initialNodes: FlowNode[]
   initialEdges: FlowEdge[]
   requirements: Requirement[]
@@ -215,7 +215,7 @@ const edgeTypes = { labelledEdge: LabelledEdge }
 
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
-export default function FlowCanvas({ flowId, initialNodes, initialEdges, requirements }: Props) {
+export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements }: Props) {
   const [nodes, setNodes, onNodesChange] = useNodesState(toRFNodes(initialNodes))
   const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(initialEdges, initialNodes))
   const [isPending, startTransition] = useTransition()
@@ -232,7 +232,7 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
   const onConnect: OnConnect = useCallback(
     async (connection) => {
       if (!connection.source || !connection.target) return
-      const dbId = await saveEdge(flowId, connection.source, connection.target)
+      const dbId = await saveEdge(projectId, connection.source, connection.target)
       if (!dbId) return
       setEdges((eds) =>
         addEdge(
@@ -248,7 +248,7 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
         )
       )
     },
-    [flowId, setEdges]
+    [projectId, setEdges]
   )
 
   const onEdgesDelete = useCallback((deletedEdges: Edge[]) => {
@@ -258,7 +258,7 @@ export default function FlowCanvas({ flowId, initialNodes, initialEdges, require
   const handleGenerateFlow = () => {
     setGenerateError(null)
     startTransition(async () => {
-      const result = await generateFlow(flowId)
+      const result = await generateFlow(projectId)
       if (result?.error) {
         setGenerateError(result.error)
         return

@@ -35,7 +35,6 @@ function statusStyle(status: string): React.CSSProperties {
 
 interface Props {
   requirementId: string
-  flowId: string
   projectId: string
   userStory: string
   businessOpportunity: string
@@ -50,7 +49,6 @@ interface Props {
 
 export function EditableRequirementCard({
   requirementId,
-  flowId,
   projectId,
   userStory,
   businessOpportunity,
@@ -83,7 +81,7 @@ export function EditableRequirementCard({
   function handleSave() {
     if (!storyVal.trim()) return
     startTransition(async () => {
-      await updateRequirement(requirementId, flowId, projectId, {
+      await updateRequirement(requirementId, projectId, {
         user_story: storyVal,
         business_opportunity: oppVal,
         acceptance_criteria: criteriaVal.filter((c) => c.trim()),

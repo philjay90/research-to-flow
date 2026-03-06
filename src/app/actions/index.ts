@@ -193,13 +193,12 @@ export async function addResearchInput(formData: FormData) {
   if (!user) return
 
   const projectId = formData.get('project_id') as string
-  const flowId = formData.get('flow_id') as string
   const type = formData.get('type') as string
   const content = formData.get('content') as string
   const sourceLabel = formData.get('source_label') as string
   const attachment = formData.get('attachment') as File | null
 
-  if (!projectId || !flowId || !type || !content?.trim()) return
+  if (!projectId || !type || !content?.trim()) return
 
   let attachmentUrl: string | null = null
 
@@ -224,7 +223,7 @@ export async function addResearchInput(formData: FormData) {
 
   const { error } = await supabase.from('research_input').insert({
     project_id: projectId,
-    flow_id: flowId,
+    flow_id: null,
     type,
     content: content.trim(),
     source_label: sourceLabel?.trim() || null,
@@ -237,18 +236,17 @@ export async function addResearchInput(formData: FormData) {
     return
   }
 
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
-export async function deleteResearchInput(inputId: string, flowId: string, projectId: string) {
+export async function deleteResearchInput(inputId: string, projectId: string) {
   const { supabase } = await getClientAndUser()
   await supabase.from('research_input').delete().eq('id', inputId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
 export async function updateResearchInput(
   inputId: string,
-  flowId: string,
   projectId: string,
   data: { type: string; source_label: string | null; content: string }
 ) {
@@ -262,13 +260,13 @@ export async function updateResearchInput(
       content: data.content.trim(),
     })
     .eq('id', inputId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
-export async function deleteAllInputs(flowId: string, projectId: string) {
+export async function deleteAllInputs(projectId: string) {
   const { supabase } = await getClientAndUser()
-  await supabase.from('research_input').delete().eq('flow_id', flowId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  await supabase.from('research_input').delete().eq('project_id', projectId)
+  revalidatePath(`/projects/${projectId}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -277,18 +275,17 @@ export async function deleteAllInputs(flowId: string, projectId: string) {
 
 export async function synthesiseInput(
   inputId: string,
-  flowId: string,
   projectId: string,
   mode: 'append' | 'replace' = 'append'
 ) {
   const { supabase, user } = await getClientAndUser()
-  if (!user || !inputId || !flowId || !projectId) return
+  if (!user || !inputId || !projectId) return
 
   if (mode === 'replace') {
     const { data: existingReqs } = await supabase
       .from('requirement')
       .select('id, source_input_ids')
-      .eq('flow_id', flowId)
+      .eq('project_id', projectId)
 
     const toDelete = (existingReqs ?? [])
       .filter((r: { source_input_ids: string[] }) => r.source_input_ids.includes(inputId))
@@ -356,7 +353,7 @@ ${input.content}`,
 
   const rows = requirements.map((req) => ({
     project_id: projectId,
-    flow_id: flowId,
+    flow_id: null,
     source_input_ids: [inputId],
     business_opportunity: req.business_opportunity,
     user_story: req.user_story,
@@ -373,18 +370,17 @@ ${input.content}`,
     return
   }
 
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
-export async function deleteRequirement(requirementId: string, flowId: string, projectId: string) {
+export async function deleteRequirement(requirementId: string, projectId: string) {
   const { supabase } = await getClientAndUser()
   await supabase.from('requirement').delete().eq('id', requirementId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
 export async function updateRequirement(
   requirementId: string,
-  flowId: string,
   projectId: string,
   data: {
     user_story: string
@@ -405,34 +401,29 @@ export async function updateRequirement(
       status: 'edited',
     })
     .eq('id', requirementId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
-export async function deleteAllRequirements(flowId: string, projectId: string) {
+export async function deleteAllRequirements(projectId: string) {
   const { supabase } = await getClientAndUser()
-  await supabase.from('requirement').delete().eq('flow_id', flowId)
-  revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+  await supabase.from('requirement').delete().eq('project_id', projectId)
+  revalidatePath(`/projects/${projectId}`)
 }
 
 // ---------------------------------------------------------------------------
 // Canvas actions
 // ---------------------------------------------------------------------------
 
-export async function generateFlow(flowId: string) {
+export async function generateFlow(projectId: string) {
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
 
   const { data: requirements } = await supabase
     .from('requirement')
     .select('business_opportunity, user_story, acceptance_criteria, dfv_tag')
-    .eq('flow_id', flowId)
+    .eq('project_id', projectId)
 
   if (!requirements || requirements.length === 0) return { error: 'No requirements to generate from' }
-
-  const { data: flow } = await supabase.from('flow').select('project_id').eq('id', flowId).single()
-  if (!flow) return { error: 'Flow not found' }
-
-  const projectId = flow.project_id
 
   const requirementsSummary = requirements
     .map((r: { business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null }, i: number) =>
@@ -505,8 +496,8 @@ ${requirementsSummary}`,
 
   const positions = applyDagreLayout(flowData.nodes, flowData.edges)
 
-  await supabase.from('flow_edge').delete().eq('flow_id', flowId)
-  await supabase.from('flow_node').delete().eq('flow_id', flowId)
+  await supabase.from('flow_edge').delete().eq('project_id', projectId).is('flow_id', null)
+  await supabase.from('flow_node').delete().eq('project_id', projectId).is('flow_id', null)
 
   const nodeIdMap = new Map<string, string>()
 
@@ -516,7 +507,7 @@ ${requirementsSummary}`,
       .from('flow_node')
       .insert({
         project_id: projectId,
-        flow_id: flowId,
+        flow_id: null,
         requirement_id: null,
         type: node.type,
         label: node.label,
@@ -539,7 +530,7 @@ ${requirementsSummary}`,
       if (!sourceId || !targetId) return null
       return {
         project_id: projectId,
-        flow_id: flowId,
+        flow_id: null,
         source_node_id: sourceId,
         target_node_id: targetId,
         label: e.label ?? null,
@@ -563,18 +554,15 @@ export async function saveNodePosition(nodeId: string, x: number, y: number) {
     .eq('id', nodeId)
 }
 
-export async function saveEdge(flowId: string, sourceNodeId: string, targetNodeId: string) {
+export async function saveEdge(projectId: string, sourceNodeId: string, targetNodeId: string) {
   const { supabase, user } = await getClientAndUser()
   if (!user) return null
-
-  const { data: flow } = await supabase.from('flow').select('project_id').eq('id', flowId).single()
-  if (!flow) return null
 
   const { data, error } = await supabase
     .from('flow_edge')
     .insert({
-      project_id: flow.project_id,
-      flow_id: flowId,
+      project_id: projectId,
+      flow_id: null,
       source_node_id: sourceNodeId,
       target_node_id: targetNodeId,
       user_id: user.id,

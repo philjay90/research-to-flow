@@ -20,7 +20,6 @@ const INPUT_TYPE_LABELS: Record<string, string> = {
 
 interface Props {
   inputId: string
-  flowId: string
   projectId: string
   type: string
   sourceLabel: string | null
@@ -33,7 +32,6 @@ interface Props {
 
 export function EditableInputCard({
   inputId,
-  flowId,
   projectId,
   type,
   sourceLabel,
@@ -63,7 +61,7 @@ export function EditableInputCard({
   function handleSave() {
     if (!contentVal.trim()) return
     startTransition(async () => {
-      await updateResearchInput(inputId, flowId, projectId, {
+      await updateResearchInput(inputId, projectId, {
         type: typeVal,
         source_label: labelVal || null,
         content: contentVal,
@@ -152,7 +150,6 @@ export function EditableInputCard({
         <div className="flex shrink-0 items-center gap-1">
           <SynthesiseButton
             inputId={inputId}
-            flowId={flowId}
             projectId={projectId}
             isSynthesized={isSynthesized}
             isModified={isModified}
