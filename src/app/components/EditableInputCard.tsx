@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { LoadingDots } from '@/app/components/LoadingDots'
 import { SynthesiseButton } from '@/app/components/SynthesiseButton'
 import { DeleteButton } from '@/app/components/DeleteButton'
 import { updateResearchInput } from '@/app/actions'
@@ -127,7 +128,7 @@ export function EditableInputCard({
             disabled={isPending || !contentVal.trim()}
             className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-4 font-semibold h-7 text-xs"
           >
-            {isPending ? 'Saving…' : 'Save'}
+            {isPending ? <LoadingDots /> : 'Save'}
           </Button>
           <Button
             onClick={handleCancel}

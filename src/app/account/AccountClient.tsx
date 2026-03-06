@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useState } from 'react'
+import { LoadingDots } from '@/app/components/LoadingDots'
 import { changePassword, deleteAccount } from '@/app/actions'
 
 // ---------------------------------------------------------------------------
@@ -51,9 +52,9 @@ function ChangePasswordForm() {
       <button
         type="submit"
         disabled={isPending}
-        className="w-full py-2 rounded-xl bg-[#1D1D1F] text-white text-sm font-medium hover:bg-black/80 disabled:opacity-50 transition-colors"
+        className="w-full py-2 rounded-xl bg-[#1D1D1F] text-white text-sm font-medium hover:bg-black/80 disabled:opacity-50 transition-colors flex items-center justify-center min-h-[38px]"
       >
-        {isPending ? 'Updating…' : 'Update password'}
+        {isPending ? <LoadingDots /> : 'Update password'}
       </button>
     </form>
   )
@@ -90,9 +91,9 @@ function DeleteAccountButton() {
           <button
             onClick={handleDelete}
             disabled={loading}
-            className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors"
+            className="flex-1 py-2 rounded-xl bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 transition-colors flex items-center justify-center min-h-[38px]"
           >
-            {loading ? 'Deleting…' : 'Yes, delete everything'}
+            {loading ? <LoadingDots /> : 'Yes, delete everything'}
           </button>
           <button
             onClick={() => setConfirming(false)}

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/app/components/AppHeader'
+import { SubmitButton } from '@/app/components/SubmitButton'
 
 export default function NewProjectPage() {
   return (
@@ -51,9 +52,9 @@ export default function NewProjectPage() {
             </div>
 
             <div className="flex gap-3 pt-2">
-              <Button type="submit" className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 font-semibold">
+              <SubmitButton className="inline-flex items-center justify-center bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 py-2 text-sm font-semibold transition-colors min-w-[120px]">
                 Create Project
-              </Button>
+              </SubmitButton>
               <Button variant="ghost" asChild className="text-foreground rounded-full">
                 <Link href="/">Cancel</Link>
               </Button>

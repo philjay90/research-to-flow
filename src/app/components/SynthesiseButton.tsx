@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { LoadingDots } from '@/app/components/LoadingDots'
 import { synthesiseInput } from '@/app/actions'
 
 interface Props {
@@ -59,7 +60,7 @@ export function SynthesiseButton({ inputId, flowId, projectId, isSynthesized, is
             : 'border-[#1D1D1F] text-[#1D1D1F] hover:bg-[#1D1D1F]/10'
         }`}
       >
-        {isPending ? '…' : isModified ? 'Re-synthesise' : 'Synthesise'}
+        {isPending ? <LoadingDots /> : isModified ? 'Re-synthesise' : 'Synthesise'}
       </Button>
 
       {/* Re-synthesise dialog */}

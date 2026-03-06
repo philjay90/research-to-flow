@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { LoadingDots } from '@/app/components/LoadingDots'
 import { signIn, signUp } from './actions'
 
 export default function LoginPage() {
@@ -77,7 +78,7 @@ export default function LoginPage() {
               disabled={isPending}
               className="w-full bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full font-semibold"
             >
-              {isPending ? '…' : mode === 'signin' ? 'Sign in' : 'Create account'}
+              {isPending ? <LoadingDots /> : mode === 'signin' ? 'Sign in' : 'Create account'}
             </Button>
           </form>
 

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { signOut } from '@/app/actions'
+import { SubmitButton } from '@/app/components/SubmitButton'
 
 interface Crumb {
   label: string
@@ -35,18 +36,23 @@ export function AppHeader({ crumbs = [], right }: AppHeaderProps) {
           </span>
         ))}
       </nav>
-      <div className="flex items-center gap-4">
-        {right && <div>{right}</div>}
-        <Link href="/account" className="text-xs text-white/40 hover:text-white/80 transition-colors">
+
+      <div className="flex items-center gap-1">
+        {right && <div className="mr-3">{right}</div>}
+
+        <Link
+          href="/account"
+          className="flex h-8 items-center rounded-full px-3.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+        >
           Account
         </Link>
+
         <form action={signOut}>
-          <button
-            type="submit"
-            className="text-xs text-white/40 hover:text-white/80 transition-colors"
+          <SubmitButton
+            className="flex h-8 items-center rounded-full px-3.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50"
           >
             Sign out
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </header>

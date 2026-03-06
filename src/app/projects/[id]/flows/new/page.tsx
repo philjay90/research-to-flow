@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/app/components/AppHeader'
+import { SubmitButton } from '@/app/components/SubmitButton'
 
 export default async function NewFlowPage({
   params,
@@ -78,9 +79,9 @@ export default async function NewFlowPage({
             </div>
 
             <div className="flex gap-3 pt-2">
-              <Button type="submit" className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 font-semibold">
+              <SubmitButton className="inline-flex items-center justify-center bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 py-2 text-sm font-semibold transition-colors min-w-[110px]">
                 Create Flow
-              </Button>
+              </SubmitButton>
               <Button asChild variant="ghost" className="text-foreground rounded-full">
                 <a href={`/projects/${id}`}>Cancel</a>
               </Button>
