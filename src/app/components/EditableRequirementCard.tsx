@@ -43,6 +43,8 @@ interface Props {
   dfvTag: string | null
   status: string
   sourceLabels: string[]
+  /** Names of personas linked to this requirement */
+  personaNames?: string[]
   onDelete: () => Promise<void>
 }
 
@@ -56,6 +58,7 @@ export function EditableRequirementCard({
   dfvTag,
   status,
   sourceLabels,
+  personaNames,
   onDelete,
 }: Props) {
   const [editing, setEditing] = useState(false)
@@ -252,6 +255,15 @@ export function EditableRequirementCard({
             {DFV_LABELS[dfvTag] ?? dfvTag}
           </Badge>
         )}
+        {personaNames && personaNames.length > 0 && personaNames.map((name) => (
+          <Badge
+            key={name}
+            style={{ backgroundColor: '#EFF6FF', color: '#3B82F6', border: '1px solid #BFDBFE' }}
+            className="text-xs font-medium rounded-full"
+          >
+            👤 {name}
+          </Badge>
+        ))}
       </div>
 
       <p className="mb-3 text-sm font-medium text-foreground">

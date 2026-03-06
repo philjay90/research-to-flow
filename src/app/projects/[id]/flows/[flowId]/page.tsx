@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { addResearchInput, deleteRequirement, deleteResearchInput, updateFlow, deleteAllInputs, deleteAllRequirements } from '@/app/actions'
-import type { Project, Flow, ResearchInput, Requirement } from '@/types'
+import type { Project, Flow, ResearchInput, Requirement, Persona } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -39,7 +39,7 @@ export default async function FlowDetailPage({
 
   if (projectError || !project || flowError || !flow) notFound()
 
-  const [{ data: inputs }, { data: requirements }] = await Promise.all([
+  const [{ data: inputs }, { data: requirements }, { data: personas }, { data: personaReqLinks }] = await Promise.all([
     supabase
       .from('research_input')
       .select('*')
@@ -50,12 +50,30 @@ export default async function FlowDetailPage({
       .select('*')
       .eq('flow_id', flowId)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('persona')
+      .select('id, name')
+      .eq('project_id', id),
+    supabase
+      .from('persona_requirement')
+      .select('persona_id, requirement_id'),
   ])
 
   const p = project as Project
   const f = flow as Flow
   const reqs = (requirements ?? []) as Requirement[]
   const ins  = (inputs ?? []) as ResearchInput[]
+
+  // Build a map of requirementId → persona names
+  const personaNameMap = new Map<string, string>((personas ?? []).map((pe: Pick<Persona, 'id' | 'name'>) => [pe.id, pe.name]))
+  const reqPersonaNames = new Map<string, string[]>()
+  for (const link of (personaReqLinks ?? [])) {
+    const name = personaNameMap.get(link.persona_id)
+    if (name) {
+      const existing = reqPersonaNames.get(link.requirement_id) ?? []
+      reqPersonaNames.set(link.requirement_id, [...existing, name])
+    }
+  }
 
   // Build a map of inputId → display label for source attribution on requirement cards
   const inputLabelMap = new Map<string, string>(
@@ -269,6 +287,7 @@ export default async function FlowDetailPage({
                         dfvTag={req.dfv_tag}
                         status={req.status}
                         sourceLabels={sourceLabels}
+                        personaNames={reqPersonaNames.get(req.id) ?? []}
                         onDelete={deleteRequirement.bind(null, req.id, flowId, id)}
                       />
                     </li>

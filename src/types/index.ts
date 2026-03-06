@@ -57,6 +57,46 @@ export interface FlowEdge {
   created_at: string
 }
 
+// ---------------------------------------------------------------------------
+// Persona types
+// ---------------------------------------------------------------------------
+
+export type PersonaFieldSource = 'data' | 'llm_inferred' | 'manual'
+
+export interface PersonaFieldProvenance {
+  source: PersonaFieldSource
+  input_ids: string[]
+}
+
+export interface Persona {
+  id: string
+  project_id: string
+  user_id: string
+  name: string
+  role_title: string
+  background: string
+  tools: string
+  macro_goals: string
+  tasks_activities: string
+  pain_points: string
+  /** { fieldName: { source, input_ids } } */
+  field_provenance: Record<string, PersonaFieldProvenance>
+  source_input_ids: string[]
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PersonaRequirement {
+  persona_id: string
+  requirement_id: string
+  link_source: 'llm' | 'manual'
+}
+
+// ---------------------------------------------------------------------------
+// Requirement types
+// ---------------------------------------------------------------------------
+
 export type DFVTag = 'desirability' | 'feasibility' | 'viability'
 export type RequirementStatus = 'active' | 'draft' | 'stale' | 'unanchored' | 'edited'
 
