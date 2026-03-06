@@ -37,6 +37,9 @@ export function AppHeader({ crumbs = [], right }: AppHeaderProps) {
       </nav>
       <div className="flex items-center gap-4">
         {right && <div>{right}</div>}
+        <Link href="/account" className="text-xs text-white/40 hover:text-white/80 transition-colors">
+          Account
+        </Link>
         <form action={signOut}>
           <button
             type="submit"

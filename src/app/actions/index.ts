@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
+import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { anthropic } from '@/lib/anthropic'
 import Dagre from '@dagrejs/dagre'
 
@@ -47,6 +48,46 @@ function applyDagreLayout(
 export async function signOut() {
   const supabase = await createClient()
   await supabase.auth.signOut()
+  redirect('/login')
+}
+
+export async function changePassword(
+  _prev: { error: string | null; success: boolean },
+  formData: FormData
+): Promise<{ error: string | null; success: boolean }> {
+  const supabase = await createClient()
+  const password = formData.get('password') as string
+  const confirm = formData.get('confirm') as string
+
+  if (!password || password.length < 6)
+    return { error: 'Password must be at least 6 characters.', success: false }
+  if (password !== confirm)
+    return { error: 'Passwords do not match.', success: false }
+
+  const { error } = await supabase.auth.updateUser({ password })
+  if (error) return { error: error.message, success: false }
+  return { error: null, success: true }
+}
+
+export async function deleteAccount(): Promise<{ error: string | null }> {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return { error: 'Not authenticated.' }
+
+  // Delete all user data – projects cascade to flows → inputs, requirements, nodes, edges
+  const { error: projectsError } = await supabase
+    .from('project')
+    .delete()
+    .eq('user_id', user.id)
+  if (projectsError) return { error: projectsError.message }
+
+  // Delete the auth user via admin client (requires service role key)
+  const adminClient = createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const { error: deleteError } = await adminClient.auth.admin.deleteUser(user.id)
+  if (deleteError) return { error: deleteError.message }
+
   redirect('/login')
 }
 
