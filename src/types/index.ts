@@ -38,6 +38,7 @@ export interface FlowNode {
   id: string
   project_id: string
   flow_id: string | null
+  persona_id: string | null
   requirement_id: string | null
   type: string
   label: string
@@ -51,6 +52,7 @@ export interface FlowEdge {
   id: string
   project_id: string
   flow_id: string | null
+  persona_id: string | null
   source_node_id: string
   target_node_id: string
   label: string | null

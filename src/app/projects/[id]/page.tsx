@@ -115,7 +115,7 @@ export default async function ProjectPage({
   const TAB_HELP: Record<string, string> = {
     inputs: 'Add and/or upload any data or insights that helps inform the product.',
     requirements: 'Synthesized User Stories and Acceptance Criteria based on raw inputs. These are generated using Anthropic LLMs. You can manually edit/add-to/remove them. These will directly impact the user-flow generated.',
-    personas: 'Synthesized personas based on the inputs provided. Anthropic LLMs will parse through your inputs and develop one or more personas based on those inputs. You can manually edit/add-to/remove them.',
+    personas: 'Synthesized personas based on the inputs provided. Anthropic LLMs will parse through your inputs and develop one or more personas based on those inputs. You can manually edit/add-to/remove them. In the Flow-View, you will be able to generate user-flow based on Persona-specific user requirements and see different flows based on the selected persona.',
   }
 
   return (

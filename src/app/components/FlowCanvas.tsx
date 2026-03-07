@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback, useRef, useState, useTransition } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import {
   ReactFlow,
   Background,
@@ -36,12 +36,18 @@ const BACK_EDGE_THRESHOLD = 30
 const DEC_W = 200
 const DEC_H = 120
 
+interface PersonaSummary {
+  id: string
+  name: string
+  updated_at: string
+}
+
 interface Props {
   projectId: string
   initialNodes: FlowNode[]
   initialEdges: FlowEdge[]
   requirements: Requirement[]
-  personas: { id: string; name: string }[]
+  personas: PersonaSummary[]
 }
 
 function toRFNodes(nodes: FlowNode[]): Node[] {
@@ -56,7 +62,7 @@ function toRFNodes(nodes: FlowNode[]): Node[] {
 /**
  * Convert DB edges to React Flow edges.
  * Back-edges (target sits above source) are routed through the left/right
- * handles. All edges use getBezierPath for smooth curves with no S-bends.
+ * handles. All edges use getSmoothStepPath for smooth curves.
  * Labels are positioned on the vertical descent via EdgeLabelRenderer.
  */
 function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
@@ -90,7 +96,6 @@ function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
 }
 
 // ── Custom edge ───────────────────────────────────────────────────────────────
-// Uses bezier curves (no kinks) and positions labels just above the target handle.
 
 function LabelledEdge({
   id,
@@ -110,8 +115,6 @@ function LabelledEdge({
     borderRadius: 8,
   })
 
-  // Forward edges: label sits above the target handle (on the vertical descent).
-  // Back-edges: target handle is on the left side of a node — label sits to the left.
   const labelTransform = isBackEdge
     ? `translate(0%, -50%) translate(${sourceX + 16}px, ${sourceY}px)`
     : `translate(-50%, -100%) translate(${targetX}px, ${targetY - 36}px)`
@@ -170,7 +173,6 @@ function StepNode({ data }: { data: Record<string, unknown> }) {
 function DecisionNode({ data }: { data: Record<string, unknown> }) {
   return (
     <div style={{ position: 'relative', width: DEC_W, height: DEC_H }}>
-      {/* SVG diamond — vertices align exactly with handle positions */}
       <svg
         style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
         width={DEC_W}
@@ -188,7 +190,6 @@ function DecisionNode({ data }: { data: Record<string, unknown> }) {
       <Handle type="target" position={Position.Top} style={{ background: DECISION_COLOR, borderColor: '#fff', zIndex: 10, width: 10, height: 10 }} />
       <Handle type="target" id="left-in" position={Position.Left} style={{ background: DECISION_COLOR, borderColor: '#fff', zIndex: 10, width: 10, height: 10 }} />
 
-      {/* Text — constrained to the diamond's inscribed region */}
       <div
         style={{
           position: 'relative',
@@ -214,15 +215,91 @@ function DecisionNode({ data }: { data: Record<string, unknown> }) {
 const nodeTypes = { stepNode: StepNode, decisionNode: DecisionNode }
 const edgeTypes = { labelledEdge: LabelledEdge }
 
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Latest ISO timestamp from an array of strings (ignores nullish values). */
+function maxDate(dates: (string | null | undefined)[]): string | null {
+  const valid = dates.filter(Boolean) as string[]
+  if (!valid.length) return null
+  return valid.reduce((a, b) => (a > b ? a : b))
+}
+
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
 export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements, personas }: Props) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(toRFNodes(initialNodes))
-  const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(initialEdges, initialNodes))
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
+
+  // Derive the subset of nodes/edges for the current persona selection.
+  const filteredNodes = useMemo(() => {
+    return initialNodes.filter((n) =>
+      selectedPersonaId ? n.persona_id === selectedPersonaId : n.persona_id === null
+    )
+  }, [initialNodes, selectedPersonaId])
+
+  const filteredEdges = useMemo(() => {
+    return initialEdges.filter((e) =>
+      selectedPersonaId ? e.persona_id === selectedPersonaId : e.persona_id === null
+    )
+  }, [initialEdges, selectedPersonaId])
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(toRFNodes(filteredNodes))
+  const [edges, setEdges, onEdgesChange] = useEdgesState(toRFEdges(filteredEdges, filteredNodes))
+
+  // Re-initialise React Flow when the persona selection changes.
+  useEffect(() => {
+    setNodes(toRFNodes(filteredNodes))
+    setEdges(toRFEdges(filteredEdges, filteredNodes))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPersonaId])
+
   const [isPending, startTransition] = useTransition()
   const [generateError, setGenerateError] = useState<string | null>(null)
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // ── Smart button state ───────────────────────────────────────────────────
+
+  /**
+   * Determine whether the generate button should be active.
+   *
+   * hasFlow   — there are nodes for the current persona selection
+   * upToDate  — no requirement or persona has been updated after the last generation
+   *
+   * States:
+   *   !hasFlow                  → "✦ Generate Flow"   (enabled)
+   *   hasFlow && !upToDate      → "↺ Re-generate"     (enabled)
+   *   hasFlow && upToDate       → "✓ Up to date"      (disabled)
+   */
+  const hasFlow = filteredNodes.length > 0
+
+  const latestGeneratedAt = hasFlow
+    ? maxDate(filteredNodes.map((n) => n.created_at))
+    : null
+
+  const latestDataChangedAt = maxDate([
+    ...requirements.flatMap((r) => [r.created_at, r.updated_at]),
+    ...personas.map((p) => p.updated_at),
+  ])
+
+  const upToDate =
+    hasFlow &&
+    latestGeneratedAt !== null &&
+    (latestDataChangedAt === null || latestDataChangedAt <= latestGeneratedAt)
+
+  const buttonDisabled = isPending || requirements.length === 0 || upToDate
+
+  const buttonLabel = isPending
+    ? null // shown separately with spinner
+    : !hasFlow
+    ? '✦ Generate Flow'
+    : upToDate
+    ? '✓ Up to date'
+    : '↺ Re-generate'
+
+  const buttonStyle: React.CSSProperties = upToDate
+    ? { backgroundColor: '#E5E5EA', color: '#86868B' }
+    : { backgroundColor: isPending ? '#d4c900' : '#F0E100', color: '#1D1D1F' }
+
+  // ── Event handlers ───────────────────────────────────────────────────────
 
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
     if (saveTimer.current) clearTimeout(saveTimer.current)
@@ -234,7 +311,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
   const onConnect: OnConnect = useCallback(
     async (connection) => {
       if (!connection.source || !connection.target) return
-      const dbId = await saveEdge(projectId, connection.source, connection.target)
+      const dbId = await saveEdge(projectId, connection.source, connection.target, selectedPersonaId || null)
       if (!dbId) return
       setEdges((eds) =>
         addEdge(
@@ -250,7 +327,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         )
       )
     },
-    [projectId, setEdges]
+    [projectId, selectedPersonaId, setEdges]
   )
 
   const onEdgesDelete = useCallback((deletedEdges: Edge[]) => {
@@ -271,7 +348,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
 
   return (
     <div className="relative h-full w-full">
-      {/* Generate Flow button + persona selector */}
+      {/* Toolbar: persona selector + generate button */}
       <div className="absolute left-1/2 top-4 z-10 -translate-x-1/2 flex flex-col items-center gap-2">
         <div className="flex items-center gap-2">
           {/* Persona selector */}
@@ -288,11 +365,13 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
               ))}
             </select>
           )}
+
+          {/* Generate / Re-generate / Up-to-date button */}
           <button
             onClick={handleGenerateFlow}
-            disabled={isPending || requirements.length === 0}
-            className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ backgroundColor: isPending ? '#d4c900' : '#F0E100', color: '#1D1D1F' }}
+            disabled={buttonDisabled}
+            className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md transition-colors disabled:cursor-not-allowed"
+            style={buttonStyle}
           >
             {isPending ? (
               <>
@@ -303,10 +382,11 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
                 Generating…
               </>
             ) : (
-              '✦ Generate Flow'
+              buttonLabel
             )}
           </button>
         </div>
+
         {generateError && <p className="text-xs text-red-500">{generateError}</p>}
         {requirements.length === 0 && !isPending && (
           <p className="text-xs" style={{ color: '#86868B' }}>Synthesise requirements first</p>

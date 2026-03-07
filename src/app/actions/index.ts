@@ -534,8 +534,16 @@ ${requirementsSummary}`,
 
   const positions = applyDagreLayout(flowData.nodes, flowData.edges)
 
-  await supabase.from('flow_edge').delete().eq('project_id', projectId).is('flow_id', null)
-  await supabase.from('flow_node').delete().eq('project_id', projectId).is('flow_id', null)
+  // Delete only the flow belonging to this persona selection
+  const edgeDelQ = supabase.from('flow_edge').delete().eq('project_id', projectId).is('flow_id', null)
+  const nodeDelQ = supabase.from('flow_node').delete().eq('project_id', projectId).is('flow_id', null)
+  if (personaId) {
+    await edgeDelQ.eq('persona_id', personaId)
+    await nodeDelQ.eq('persona_id', personaId)
+  } else {
+    await edgeDelQ.is('persona_id', null)
+    await nodeDelQ.is('persona_id', null)
+  }
 
   const nodeIdMap = new Map<string, string>()
 
@@ -546,6 +554,7 @@ ${requirementsSummary}`,
       .insert({
         project_id: projectId,
         flow_id: null,
+        persona_id: personaId ?? null,
         requirement_id: null,
         type: node.type,
         label: node.label,
@@ -569,6 +578,7 @@ ${requirementsSummary}`,
       return {
         project_id: projectId,
         flow_id: null,
+        persona_id: personaId ?? null,
         source_node_id: sourceId,
         target_node_id: targetId,
         label: e.label ?? null,
@@ -592,7 +602,12 @@ export async function saveNodePosition(nodeId: string, x: number, y: number) {
     .eq('id', nodeId)
 }
 
-export async function saveEdge(projectId: string, sourceNodeId: string, targetNodeId: string) {
+export async function saveEdge(
+  projectId: string,
+  sourceNodeId: string,
+  targetNodeId: string,
+  personaId?: string | null,
+) {
   const { supabase, user } = await getClientAndUser()
   if (!user) return null
 
@@ -601,6 +616,7 @@ export async function saveEdge(projectId: string, sourceNodeId: string, targetNo
     .insert({
       project_id: projectId,
       flow_id: null,
+      persona_id: personaId ?? null,
       source_node_id: sourceNodeId,
       target_node_id: targetNodeId,
       user_id: user.id,

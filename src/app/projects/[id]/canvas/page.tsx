@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { FlowNode, FlowEdge, Requirement, Persona } from '@/types'
+import type { FlowNode, FlowEdge, Requirement } from '@/types'
 import { AppHeader } from '@/app/components/AppHeader'
 import FlowCanvas from '@/app/components/FlowCanvas'
 
@@ -20,6 +20,8 @@ export default async function CanvasPage({
 
   if (projectError || !project) notFound()
 
+  // Load ALL nodes/edges for the project (unfiltered by persona_id).
+  // FlowCanvas filters client-side when the persona selector changes.
   const [{ data: nodes }, { data: edges }, { data: requirements }, { data: personas }] = await Promise.all([
     supabase
       .from('flow_node')
@@ -33,11 +35,12 @@ export default async function CanvasPage({
       .is('flow_id', null),
     supabase
       .from('requirement')
-      .select('*')
+      .select('id, created_at, updated_at, business_opportunity, user_story, acceptance_criteria, dfv_tag, source_input_ids, project_id, flow_id, status')
       .eq('project_id', id),
+    // Include updated_at so the client can detect if personas changed since last generation
     supabase
       .from('persona')
-      .select('id, name')
+      .select('id, name, updated_at')
       .eq('project_id', id)
       .order('created_at', { ascending: true }),
   ])
@@ -61,7 +64,7 @@ export default async function CanvasPage({
           initialNodes={(nodes ?? []) as FlowNode[]}
           initialEdges={(edges ?? []) as FlowEdge[]}
           requirements={(requirements ?? []) as Requirement[]}
-          personas={(personas ?? []) as Pick<Persona, 'id' | 'name'>[]}
+          personas={(personas ?? []) as { id: string; name: string; updated_at: string }[]}
         />
       </div>
     </>
