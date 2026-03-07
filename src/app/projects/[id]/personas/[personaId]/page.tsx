@@ -49,6 +49,17 @@ export default async function PersonaDetailPage({
     .filter((r) => linkedIds.has(r.id))
     .map((r) => ({ ...r, link_source: linkSourceMap.get(r.id) as 'llm' | 'manual' }))
 
+  // Fetch ALL persona_requirement links for this project so we can show
+  // which unlinked requirements have zero persona associations at all
+  const { data: allProjectLinks } = await supabase
+    .from('persona_requirement')
+    .select('requirement_id')
+    .in('requirement_id', reqs.map((r) => r.id))
+
+  const requirementIdsWithAnyPersona = Array.from(
+    new Set((allProjectLinks ?? []).map((l: { requirement_id: string }) => l.requirement_id))
+  )
+
   return (
     <>
       <AppHeader
@@ -87,6 +98,7 @@ export default async function PersonaDetailPage({
           projectId={id}
           linkedRequirements={linkedRequirements}
           allRequirements={reqs}
+          requirementIdsWithAnyPersona={requirementIdsWithAnyPersona}
         />
       </main>
     </>

@@ -8,6 +8,8 @@ import {
   updateProject,
   deleteAllInputs,
   deleteAllRequirements,
+  linkPersonaRequirement,
+  unlinkPersonaRequirement,
 } from '@/app/actions'
 import type { Project, ResearchInput, Requirement, Persona } from '@/types'
 import { Button } from '@/components/ui/button'
@@ -25,7 +27,7 @@ import { ProvenanceLegend } from '@/app/components/ProvenanceDot'
 import { HelpTooltip } from '@/app/components/HelpTooltip'
 
 const INPUT_TYPE_LABELS: Record<string, string> = {
-  interview_notes: 'Interview Notes',
+  interview_notes: 'Notes',
   transcript: 'Transcript',
   screenshot: 'Screenshot',
   business_requirements: 'Business Requirements',
@@ -99,16 +101,17 @@ export default async function ProjectPage({
     }
   }
 
-  // Build requirementId → persona names
+  // Build requirementId → linked personas (id + name)
   const personaNameMap = new Map<string, string>(personaList.map((pe) => [pe.id, pe.name]))
-  const reqPersonaNames = new Map<string, string[]>()
+  const reqPersonaLinks = new Map<string, { id: string; name: string }[]>()
   for (const link of (personaReqLinks ?? [])) {
     const name = personaNameMap.get(link.persona_id)
     if (name) {
-      const existing = reqPersonaNames.get(link.requirement_id) ?? []
-      reqPersonaNames.set(link.requirement_id, [...existing, name])
+      const existing = reqPersonaLinks.get(link.requirement_id) ?? []
+      reqPersonaLinks.set(link.requirement_id, [...existing, { id: link.persona_id, name }])
     }
   }
+  const allPersonaOptions = personaList.map((pe) => ({ id: pe.id, name: pe.name }))
 
   const activeTab = ['inputs', 'requirements', 'personas'].includes(tab ?? '') ? tab : 'inputs'
 
@@ -336,7 +339,10 @@ export default async function ProjectPage({
                           dfvTag={req.dfv_tag}
                           status={req.status}
                           sourceLabels={sourceLabels}
-                          personaNames={reqPersonaNames.get(req.id) ?? []}
+                          linkedPersonas={reqPersonaLinks.get(req.id) ?? []}
+                          allPersonas={allPersonaOptions}
+                          onLinkPersona={linkPersonaRequirement}
+                          onUnlinkPersona={unlinkPersonaRequirement}
                           onDelete={deleteRequirement.bind(null, req.id, id)}
                         />
                       </li>

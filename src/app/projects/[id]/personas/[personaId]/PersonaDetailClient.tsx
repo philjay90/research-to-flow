@@ -6,6 +6,7 @@ import { Pencil } from 'lucide-react'
 import type { Persona, Requirement, PersonaRequirement, PersonaFieldSource } from '@/types'
 import { ProvenanceDot } from '@/app/components/ProvenanceDot'
 import { LoadingDots } from '@/app/components/LoadingDots'
+import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { updatePersona, linkPersonaRequirement, unlinkPersonaRequirement } from '@/app/actions'
 
 // ---------------------------------------------------------------------------
@@ -148,11 +149,14 @@ function RequirementLinkRow({
   requirement,
   linked,
   linkSource,
+  hasAnyPersona,
   onToggle,
 }: {
   requirement: Requirement
   linked: boolean
   linkSource?: 'llm' | 'manual'
+  /** True if this requirement is linked to at least one persona across the whole project */
+  hasAnyPersona: boolean
   onToggle: () => Promise<void>
 }) {
   const [isPending, startTransition] = useTransition()
@@ -165,11 +169,21 @@ function RequirementLinkRow({
     <div className="flex items-start gap-3 rounded-xl bg-white px-4 py-3 shadow-sm">
       <div className="flex-1 min-w-0">
         <p className="text-sm italic text-[#1D1D1F] leading-snug line-clamp-2">{requirement.user_story}</p>
-        {linkSource && (
-          <p className="mt-1 text-xs text-[#86868B]">
-            Linked by {linkSource === 'llm' ? 'AI' : 'you'}
-          </p>
-        )}
+        <div className="mt-1 flex items-center gap-2 flex-wrap">
+          {linkSource && (
+            <p className="text-xs text-[#86868B]">
+              Linked by {linkSource === 'llm' ? 'AI' : 'you'}
+            </p>
+          )}
+          {!linked && !hasAnyPersona && (
+            <span
+              className="inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{ backgroundColor: '#F5F5F7', color: '#86868B' }}
+            >
+              No persona assigned
+            </span>
+          )}
+        </div>
       </div>
       <button
         onClick={handleToggle}
@@ -195,6 +209,7 @@ interface PersonaDetailClientProps {
   projectId: string
   linkedRequirements: (Requirement & { link_source: 'llm' | 'manual' })[]
   allRequirements: Requirement[]
+  requirementIdsWithAnyPersona: string[]
 }
 
 export function PersonaDetailClient({
@@ -202,11 +217,13 @@ export function PersonaDetailClient({
   projectId,
   linkedRequirements,
   allRequirements,
+  requirementIdsWithAnyPersona,
 }: PersonaDetailClientProps) {
   const router = useRouter()
   const provenance = persona.field_provenance ?? {}
   const linkedIds = new Set(linkedRequirements.map((r) => r.id))
   const unlinkedRequirements = allRequirements.filter((r) => !linkedIds.has(r.id))
+  const idsWithAnyPersona = new Set(requirementIdsWithAnyPersona)
 
   async function handleFieldSave(field: PersonaField, value: string) {
     await updatePersona(personaId, projectId, { [field]: value }, [field])
@@ -233,8 +250,12 @@ export function PersonaDetailClient({
 
       {/* Linked requirements */}
       <section>
-        <h2 className="mb-4 text-xl font-semibold tracking-tight text-[#1D1D1F]">
+        <h2 className="mb-4 flex items-center gap-2 text-xl font-semibold tracking-tight text-[#1D1D1F]">
           Linked Requirements
+          <HelpTooltip
+            text="Summary view of user requirements that are associated with this Persona. Link or Unlink them to adjust the user flow for each persona."
+            position="right"
+          />
         </h2>
 
         {linkedRequirements.length === 0 && unlinkedRequirements.length === 0 && (
@@ -249,6 +270,7 @@ export function PersonaDetailClient({
                 requirement={req}
                 linked
                 linkSource={req.link_source}
+                hasAnyPersona={idsWithAnyPersona.has(req.id)}
                 onToggle={async () => {
                   await unlinkPersonaRequirement(personaId, req.id, projectId)
                   router.refresh()
@@ -267,6 +289,7 @@ export function PersonaDetailClient({
                   key={req.id}
                   requirement={req}
                   linked={false}
+                  hasAnyPersona={idsWithAnyPersona.has(req.id)}
                   onToggle={async () => {
                     await linkPersonaRequirement(personaId, req.id, projectId)
                     router.refresh()
