@@ -128,7 +128,7 @@ export default async function ProjectPage({
             size="sm"
             className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-5 font-semibold"
           >
-            <Link href={`/projects/${id}/canvas`}>Canvas →</Link>
+            <Link href={`/projects/${id}/canvas`}>Flow Canvas</Link>
           </Button>
         }
       />

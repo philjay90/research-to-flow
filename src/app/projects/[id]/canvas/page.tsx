@@ -6,10 +6,13 @@ import FlowCanvas from '@/app/components/FlowCanvas'
 
 export default async function CanvasPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ persona?: string }>
 }) {
   const { id } = await params
+  const { persona: initialPersonaId } = await searchParams
   const supabase = await createClient()
 
   const { data: project, error: projectError } = await supabase
@@ -61,6 +64,7 @@ export default async function CanvasPage({
       <div style={{ height: 'calc(100vh - 57px)' }}>
         <FlowCanvas
           projectId={id}
+          initialPersonaId={initialPersonaId ?? ''}
           initialNodes={(nodes ?? []) as FlowNode[]}
           initialEdges={(edges ?? []) as FlowEdge[]}
           requirements={(requirements ?? []) as Requirement[]}

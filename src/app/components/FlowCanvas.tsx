@@ -22,6 +22,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { saveNodePosition, saveEdge, deleteEdge, generateFlow } from '@/app/actions'
+import { LoadingDots } from '@/app/components/LoadingDots'
 import type { FlowNode, FlowEdge, Requirement } from '@/types'
 
 // Brand palette constants
@@ -44,6 +45,7 @@ interface PersonaSummary {
 
 interface Props {
   projectId: string
+  initialPersonaId?: string
   initialNodes: FlowNode[]
   initialEdges: FlowEdge[]
   requirements: Requirement[]
@@ -226,8 +228,8 @@ function maxDate(dates: (string | null | undefined)[]): string | null {
 
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
-export default function FlowCanvas({ projectId, initialNodes, initialEdges, requirements, personas }: Props) {
-  const [selectedPersonaId, setSelectedPersonaId] = useState<string>('')
+export default function FlowCanvas({ projectId, initialPersonaId = '', initialNodes, initialEdges, requirements, personas }: Props) {
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>(initialPersonaId)
 
   // Derive the subset of nodes/edges for the current persona selection.
   const filteredNodes = useMemo(() => {
@@ -342,7 +344,15 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
         setGenerateError(result.error)
         return
       }
-      window.location.reload()
+      // Preserve current persona selection in the URL so the page
+      // re-opens on the same persona after reload instead of "All requirements"
+      const url = new URL(window.location.href)
+      if (selectedPersonaId) {
+        url.searchParams.set('persona', selectedPersonaId)
+      } else {
+        url.searchParams.delete('persona')
+      }
+      window.location.href = url.toString()
     })
   }
 
@@ -373,17 +383,7 @@ export default function FlowCanvas({ projectId, initialNodes, initialEdges, requ
             className="flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold shadow-md transition-colors disabled:cursor-not-allowed"
             style={buttonStyle}
           >
-            {isPending ? (
-              <>
-                <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                </svg>
-                Generating…
-              </>
-            ) : (
-              buttonLabel
-            )}
+            {isPending ? <LoadingDots /> : buttonLabel}
           </button>
         </div>
 
