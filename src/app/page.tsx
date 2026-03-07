@@ -4,6 +4,7 @@ import type { Project } from '@/types'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/app/components/AppHeader'
 import { DeleteButton } from '@/app/components/DeleteButton'
+import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { deleteProject } from '@/app/actions'
 
 export default async function HomePage() {
@@ -22,7 +23,14 @@ export default async function HomePage() {
       <AppHeader />
       <main className="mx-auto max-w-3xl px-8 py-16">
         <div className="mb-10 flex items-end justify-between">
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>
+            <HelpTooltip
+              text="A project can be part or a complete product. Within a project you will be able to create multiple decision flows based on raw inputs that generate user stories and/or personas. Click the (+) button to add a project."
+              position="bottom"
+              className="mb-0.5"
+            />
+          </div>
           <Link href="/projects/new" className="bg-[#F0E100] hover:bg-[#d4c900] rounded-full h-10 w-10 text-xl font-bold text-[#1D1D1F] flex items-center justify-center transition-colors leading-none">+</Link>
         </div>
 

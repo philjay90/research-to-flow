@@ -22,6 +22,7 @@ import { EditableRequirementCard } from '@/app/components/EditableRequirementCar
 import { PersonaCard } from '@/app/components/PersonaCard'
 import { SynthesizePersonasButton } from '@/app/components/SynthesizePersonasButton'
 import { ProvenanceLegend } from '@/app/components/ProvenanceDot'
+import { HelpTooltip } from '@/app/components/HelpTooltip'
 
 const INPUT_TYPE_LABELS: Record<string, string> = {
   interview_notes: 'Interview Notes',
@@ -111,6 +112,12 @@ export default async function ProjectPage({
 
   const activeTab = ['inputs', 'requirements', 'personas'].includes(tab ?? '') ? tab : 'inputs'
 
+  const TAB_HELP: Record<string, string> = {
+    inputs: 'Add and/or upload any data or insights that helps inform the product.',
+    requirements: 'Synthesized User Stories and Acceptance Criteria based on raw inputs. These are generated using Anthropic LLMs. You can manually edit/add-to/remove them. These will directly impact the user-flow generated.',
+    personas: 'Synthesized personas based on the inputs provided. Anthropic LLMs will parse through your inputs and develop one or more personas based on those inputs. You can manually edit/add-to/remove them.',
+  }
+
   return (
     <>
       <AppHeader
@@ -145,7 +152,7 @@ export default async function ProjectPage({
               <Link
                 key={key}
                 href={`/projects/${id}?tab=${key}`}
-                className={`flex h-8 items-center rounded-full px-4 text-sm font-medium transition-colors ${
+                className={`flex h-8 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors ${
                   activeTab === key
                     ? 'bg-white text-[#1D1D1F] shadow-sm'
                     : 'text-[#86868B] hover:text-[#1D1D1F]'
@@ -153,8 +160,9 @@ export default async function ProjectPage({
               >
                 {label}
                 {count > 0 && (
-                  <span className="ml-1.5 text-xs opacity-60">{count}</span>
+                  <span className="text-xs opacity-60">{count}</span>
                 )}
+                <HelpTooltip text={TAB_HELP[key]} position="bottom" />
               </Link>
             ))}
           </div>
