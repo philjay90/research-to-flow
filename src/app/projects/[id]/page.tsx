@@ -175,41 +175,7 @@ export default async function ProjectPage({
         {/* ── INPUTS TAB ── */}
         {activeTab === 'inputs' && (
           <div className="space-y-6">
-            {ins.length === 0 ? (
-              <p className="text-sm text-[#86868B]">No inputs yet. Add one below.</p>
-            ) : (
-              <>
-                <ul className="space-y-3">
-                  {ins.map((input) => {
-                    const synthAt = lastSynthAt.get(input.id)
-                    const isSynthesized = !!synthAt
-                    const isModified = isSynthesized && input.updated_at > synthAt!
-                    return (
-                      <li key={input.id}>
-                        <EditableInputCard
-                          inputId={input.id}
-                          projectId={id}
-                          type={input.type}
-                          sourceLabel={input.source_label}
-                          content={input.content}
-                          attachmentUrl={input.attachment_url}
-                          isSynthesized={isSynthesized}
-                          isModified={isModified}
-                          onDelete={deleteResearchInput.bind(null, input.id, id)}
-                        />
-                      </li>
-                    )
-                  })}
-                </ul>
-                <DeleteAllButton
-                  action={deleteAllInputs.bind(null, id)}
-                  label="Delete all inputs"
-                  confirmMessage="Delete ALL inputs for this project? This cannot be undone."
-                />
-              </>
-            )}
-
-            {/* Add input form */}
+            {/* Add input form — always at the top */}
             <div className="rounded-2xl bg-white p-6 shadow-sm">
               <p className="mb-3 text-sm font-semibold text-[#1D1D1F]">Add Research Input</p>
               <p className="mb-5 text-sm text-[#86868B] leading-relaxed">
@@ -284,6 +250,39 @@ export default async function ProjectPage({
                 </Button>
               </form>
             </div>
+
+            {/* Existing inputs */}
+            {ins.length > 0 && (
+              <>
+                <ul className="space-y-3">
+                  {ins.map((input) => {
+                    const synthAt = lastSynthAt.get(input.id)
+                    const isSynthesized = !!synthAt
+                    const isModified = isSynthesized && input.updated_at > synthAt!
+                    return (
+                      <li key={input.id}>
+                        <EditableInputCard
+                          inputId={input.id}
+                          projectId={id}
+                          type={input.type}
+                          sourceLabel={input.source_label}
+                          content={input.content}
+                          attachmentUrl={input.attachment_url}
+                          isSynthesized={isSynthesized}
+                          isModified={isModified}
+                          onDelete={deleteResearchInput.bind(null, input.id, id)}
+                        />
+                      </li>
+                    )
+                  })}
+                </ul>
+                <DeleteAllButton
+                  action={deleteAllInputs.bind(null, id)}
+                  label="Delete all inputs"
+                  confirmMessage="Delete ALL inputs for this project? This cannot be undone."
+                />
+              </>
+            )}
           </div>
         )}
 
