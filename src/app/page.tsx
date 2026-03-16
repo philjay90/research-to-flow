@@ -21,7 +21,7 @@ export default async function HomePage() {
   return (
     <>
       <AppHeader />
-      <main className="mx-auto max-w-3xl px-8 py-16">
+      <main className="px-8 py-16">
         <div className="mb-10 flex items-end justify-between">
           <div className="flex items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight text-foreground">Projects</h1>

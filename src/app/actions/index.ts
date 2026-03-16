@@ -938,6 +938,7 @@ export async function linkPersonaRequirement(
       { onConflict: 'persona_id,requirement_id' }
     )
   revalidatePath(`/projects/${projectId}/personas/${personaId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
 export async function unlinkPersonaRequirement(
@@ -952,6 +953,7 @@ export async function unlinkPersonaRequirement(
     .eq('persona_id', personaId)
     .eq('requirement_id', requirementId)
   revalidatePath(`/projects/${projectId}/personas/${personaId}`)
+  revalidatePath(`/projects/${projectId}`)
 }
 
 // ---------------------------------------------------------------------------

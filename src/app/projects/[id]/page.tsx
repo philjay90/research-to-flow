@@ -113,7 +113,7 @@ export default async function ProjectPage({
         }
       />
 
-      <main className="mx-auto max-w-3xl px-8 py-12">
+      <main className="px-8 py-12">
         {/* Editable project title + description */}
         <EditableHeader
           name={p.name}

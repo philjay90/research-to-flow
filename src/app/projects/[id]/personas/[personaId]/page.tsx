@@ -70,7 +70,7 @@ export default async function PersonaDetailPage({
         ]}
       />
 
-      <main className="mx-auto max-w-2xl px-8 py-12">
+      <main className="px-8 py-12">
         {/* Page header */}
         <div className="mb-8">
           <div className="mb-1 flex items-center gap-2">
