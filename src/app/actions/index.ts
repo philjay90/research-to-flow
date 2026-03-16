@@ -1034,7 +1034,9 @@ ${requirementsSummary}`,
     ],
   })
 
-  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+  const rawText = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+  // Strip markdown code fences if present (e.g. ```json ... ```)
+  const raw = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim()
   let parsed: { stages: string[]; assignments: { requirement_id: string; stage: string }[] }
   try {
     parsed = JSON.parse(raw)
