@@ -953,3 +953,125 @@ export async function unlinkPersonaRequirement(
     .eq('requirement_id', requirementId)
   revalidatePath(`/projects/${projectId}/personas/${personaId}`)
 }
+
+// ---------------------------------------------------------------------------
+// Journey inference
+// ---------------------------------------------------------------------------
+
+export async function inferJourney(
+  projectId: string
+): Promise<{ error?: string; stages?: string[] }> {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data: inputs } = await supabase
+    .from('research_input')
+    .select('id, type, content, source_label')
+    .eq('project_id', projectId)
+
+  if (!inputs || inputs.length === 0) {
+    return { error: 'No research inputs found for this project.' }
+  }
+
+  const { data: requirements } = await supabase
+    .from('requirement')
+    .select('id, user_story, business_opportunity')
+    .eq('project_id', projectId)
+
+  if (!requirements || requirements.length === 0) {
+    return { error: 'No requirements found. Generate requirements first.' }
+  }
+
+  const inputsSummary = inputs
+    .map(
+      (inp) =>
+        `[Input ID: ${inp.id}]
+Type: ${inp.type}${inp.source_label ? `\nSource: ${inp.source_label}` : ''}
+Content: ${inp.content}`
+    )
+    .join('\n\n---\n\n')
+
+  const requirementsSummary = requirements
+    .map(
+      (r) =>
+        `[Requirement ID: ${r.id}]
+User story: ${r.user_story}
+Business opportunity: ${r.business_opportunity}`
+    )
+    .join('\n\n')
+
+  const response = await anthropic.messages.create({
+    model: 'claude-opus-4-6',
+    max_tokens: 4096,
+    messages: [
+      {
+        role: 'user',
+        content: `You are a UX researcher mapping user requirements onto a task-context journey.
+
+Your goal is to define 3–5 stage names that describe the situational context AROUND using this product — not a customer lifecycle, but the real-world scenario a user is in before they open the app, while they are using it, and after they put it down.
+
+For example, for a grocery list app the stages might be: "Planning the Shop", "At the Supermarket", "Back Home".
+For a fitness app: "Preparing for a Workout", "During the Workout", "Post-Workout Recovery".
+
+RULES:
+- Stage names should be short (2–5 words), descriptive, and specific to THIS product's context
+- Define between 3 and 5 stages
+- Every requirement must be assigned to exactly one stage
+- Respond with ONLY a JSON object matching this schema — no markdown, no explanation:
+{
+  "stages": ["Stage A", "Stage B", "Stage C"],
+  "assignments": [
+    { "requirement_id": "<uuid>", "stage": "<one of the stage names>" }
+  ]
+}
+
+RESEARCH INPUTS:
+${inputsSummary}
+
+USER REQUIREMENTS:
+${requirementsSummary}`,
+      },
+    ],
+  })
+
+  const raw = response.content[0].type === 'text' ? response.content[0].text.trim() : ''
+  let parsed: { stages: string[]; assignments: { requirement_id: string; stage: string }[] }
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return { error: 'Failed to parse journey response from AI.' }
+  }
+
+  // Persist stage names on the project
+  await supabase
+    .from('project')
+    .update({ journey_stages: parsed.stages })
+    .eq('id', projectId)
+
+  // Batch-update each requirement's journey_stage
+  await Promise.all(
+    parsed.assignments.map(({ requirement_id, stage }) =>
+      supabase
+        .from('requirement')
+        .update({ journey_stage: stage })
+        .eq('id', requirement_id)
+        .eq('project_id', projectId)
+    )
+  )
+
+  revalidatePath(`/projects/${projectId}`)
+  return { stages: parsed.stages }
+}
+
+export async function updateRequirementStage(
+  requirementId: string,
+  stage: string | null,
+  projectId: string
+) {
+  const { supabase } = await getClientAndUser()
+  await supabase
+    .from('requirement')
+    .update({ journey_stage: stage })
+    .eq('id', requirementId)
+  revalidatePath(`/projects/${projectId}`)
+}

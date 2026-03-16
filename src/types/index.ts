@@ -9,6 +9,7 @@ export interface Project {
   id: string
   name: string
   description: string | null
+  journey_stages: string[] | null
   created_at: string
   updated_at: string
 }
@@ -112,6 +113,7 @@ export interface Requirement {
   acceptance_criteria: string[]
   dfv_tag: DFVTag | null
   status: RequirementStatus
+  journey_stage: string | null
   created_at: string
   updated_at: string
 }
