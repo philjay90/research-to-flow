@@ -99,6 +99,8 @@ export interface PersonaFieldProvenance {
   input_ids: string[]
 }
 
+export type MockupStatus = 'idle' | 'pending' | 'running' | 'complete' | 'failed'
+
 export interface Persona {
   id: string
   project_id: string
@@ -114,6 +116,13 @@ export interface Persona {
   field_provenance: Record<string, PersonaFieldProvenance>
   source_input_ids: string[]
   status: string
+  mockup_status: MockupStatus
+  mockup_visual_direction: Record<string, unknown> | null
+  mockup_screens: Record<string, unknown>[] | null
+  mockup_prototype_html: string | null
+  mockup_figma_json: Record<string, unknown> | null
+  mockup_canvas_hash: string | null
+  mockup_pending_diff: boolean
   created_at: string
   updated_at: string
 }

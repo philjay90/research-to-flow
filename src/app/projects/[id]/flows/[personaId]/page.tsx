@@ -9,6 +9,7 @@ import { GenerateJourneyButton } from '@/app/components/GenerateJourneyButton'
 import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { PersonaDetailClient } from '../../personas/[personaId]/PersonaDetailClient'
 import { FlowCanvasWrapper } from '@/app/components/FlowCanvasWrapper'
+import { MockupPanel } from '@/app/components/MockupPanel'
 import { AddInputButton } from '@/app/components/AddInputButton'
 import { SynthesizeFlowButton } from '@/app/components/SynthesizeFlowButton'
 import { RegeneratePersonaButton } from '@/app/components/RegeneratePersonaButton'
@@ -144,13 +145,14 @@ export default async function FlowDetailPage({
   }
   const activeInputTypes = INPUT_TYPE_ORDER.filter((t) => inputsByType.has(t))
 
-  const activeTab = ['inputs', 'persona', 'journey', 'canvas'].includes(tab) ? tab : 'inputs'
+  const activeTab = ['inputs', 'persona', 'journey', 'canvas', 'mockup'].includes(tab) ? tab : 'inputs'
 
   const TAB_HELP: Record<string, string> = {
     inputs: 'Research inputs specific to this flow. Add inputs here, then click Synthesize to generate the persona.',
     persona: 'The persona this flow is built around, including their goals and pain points.',
     journey: 'The user journey stages and linked requirements for this flow.',
     canvas: 'The happy path flow canvas for this persona.',
+    mockup: 'AI-generated UI mockup and HTML prototype for this flow.',
   }
 
   const isCanvas = activeTab === 'canvas'
@@ -173,6 +175,7 @@ export default async function FlowDetailPage({
               { key: 'persona', label: 'Persona',  count: 0 },
               { key: 'journey', label: 'Journey',  count: 0 },
               { key: 'canvas',  label: 'Canvas',   count: 0 },
+              { key: 'mockup',  label: 'Mockup',   count: 0 },
             ].map(({ key, label, count }) => (
               <Link
                 key={key}
@@ -335,6 +338,19 @@ export default async function FlowDetailPage({
               personas={[{ id: pers.id, name: pers.name, updated_at: pers.updated_at }]}
             />
           </div>
+        )}
+
+        {/* ── MOCKUP TAB ── */}
+        {activeTab === 'mockup' && (
+          <MockupPanel
+            projectId={id}
+            personaId={personaId}
+            initialStatus={pers.mockup_status}
+            initialPendingDiff={pers.mockup_pending_diff}
+            initialScreens={pers.mockup_screens}
+            initialPrototypeHtml={pers.mockup_prototype_html}
+            initialFigmaJson={pers.mockup_figma_json}
+          />
         )}
       </main>
     </>
