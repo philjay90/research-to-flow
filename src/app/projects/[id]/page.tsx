@@ -125,7 +125,7 @@ export default async function ProjectPage({
                 className={`flex h-11 items-center gap-1.5 px-5 text-sm font-medium transition-colors border-b-2 -mb-px ${
                   activeTab === key
                     ? 'border-[#1D1D1F] text-[#1D1D1F]'
-                    : 'border-transparent text-[#86868B] hover:text-[#1D1D1F] hover:border-[#C7C7CC]'
+                    : 'border-transparent text-[#1D1D1F] hover:border-[#C7C7CC]'
                 }`}
               >
                 {label}
