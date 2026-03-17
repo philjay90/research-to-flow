@@ -37,7 +37,7 @@ export async function runUxDesignAgent({
   const personaSummary = buildPersonaSummary(typedPersona)
 
   try {
-    // Step 1: Visual Direction
+    // Step 1: Visual Direction (25s hard timeout)
     const directionRes = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 1000,
@@ -55,10 +55,10 @@ ${canvasSummary}
 Return JSON: { "style": string, "color_emphasis": string, "layout_approach": string, "key_ui_patterns": [string], "tone": string }`,
         },
       ],
-    })
+    }, { timeout: 25000 })
     const visualDirection = parseJson(directionRes)
 
-    // Step 2: Screen Specs
+    // Step 2: Screen Specs (40s hard timeout)
     const screensRes = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 2000,
@@ -76,7 +76,7 @@ Visual direction: ${JSON.stringify(visualDirection)}
 Return JSON array: [{ "screen_id": string, "title": string, "layout": string, "components": [{ "type": string, "label": string, "action": string }], "notes": string }]`,
         },
       ],
-    })
+    }, { timeout: 40000 })
     const screens = parseJson(screensRes)
 
     // Step 3: HTML Prototype (deterministic — built from screen specs, no LLM call)

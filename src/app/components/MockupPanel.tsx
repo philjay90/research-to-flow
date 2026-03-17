@@ -120,16 +120,32 @@ export function MockupPanel({
   if (status === 'pending' || status === 'running') {
     const mins = Math.floor(elapsed / 60)
     const secs = elapsed % 60
-    const elapsedStr = mins > 0
-      ? `${mins}m ${secs}s`
-      : `${secs}s`
+    const elapsedStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
 
-    const STEPS = [
-      'Analysing design direction',
-      'Generating screen specs',
-    ]
-    // Estimate step based on elapsed time (~25s per step)
+    const STEPS = ['Analysing design direction', 'Generating screen specs']
     const estimatedStep = Math.min(Math.floor(elapsed / 25), 1)
+
+    // If still running after 90s, the server process was likely killed — offer retry
+    const isStuck = elapsed > 90
+
+    if (isStuck) {
+      return (
+        <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20 text-center shadow-sm">
+          <p className="text-lg font-medium text-[#1D1D1F]">Generation timed out</p>
+          <p className="mt-2 text-sm text-[#86868B] max-w-sm">
+            The server took too long to respond. This is usually a transient issue.
+          </p>
+          <button
+            onClick={handleRerun}
+            disabled={isActing}
+            className="mt-6 flex h-9 items-center gap-2 rounded-full bg-[#F0E100] px-5 text-sm font-semibold text-[#1D1D1F] hover:bg-[#d4c900] disabled:opacity-50 transition-colors"
+          >
+            {isActing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            Try again
+          </button>
+        </div>
+      )
+    }
 
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm">
@@ -138,7 +154,7 @@ export function MockupPanel({
           {status === 'pending' ? 'Queued — starting soon…' : 'Generating mockup'}
         </p>
         <p className="text-xs text-[#86868B] mb-6">
-          {elapsed > 0 ? `Running for ${elapsedStr}` : 'This usually takes 1–3 minutes'}
+          {elapsed > 0 ? `Running for ${elapsedStr}` : 'This usually takes under a minute'}
         </p>
 
         {status === 'running' && (
@@ -158,15 +174,6 @@ export function MockupPanel({
               </li>
             ))}
           </ol>
-        )}
-
-        {elapsed > 180 && (
-          <button
-            onClick={() => window.location.reload()}
-            className="text-xs text-[#86868B] underline underline-offset-2 hover:text-[#1D1D1F] transition-colors"
-          >
-            Taking longer than expected — click to refresh
-          </button>
         )}
       </div>
     )
