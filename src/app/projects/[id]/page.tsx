@@ -122,8 +122,8 @@ export default async function ProjectPage({
         />
 
         {/* Tab switcher */}
-        <div className="mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-1 rounded-full bg-[#F5F5F7] p-1">
+        <div className="mb-8 flex items-end justify-between border-b border-[#E5E5EA]">
+          <div className="flex items-end">
             {[
               { key: 'inputs', label: 'Inputs', count: ins.length },
               { key: 'journey', label: 'User Journeys', count: reqs.length },
@@ -132,10 +132,10 @@ export default async function ProjectPage({
               <Link
                 key={key}
                 href={`/projects/${id}?tab=${key}`}
-                className={`flex h-8 items-center gap-1.5 rounded-full px-4 text-sm font-medium transition-colors ${
+                className={`flex h-11 items-center gap-1.5 px-5 text-sm font-medium transition-colors border-b-2 -mb-px ${
                   activeTab === key
-                    ? 'bg-white text-[#1D1D1F] shadow-sm'
-                    : 'text-[#86868B] hover:text-[#1D1D1F]'
+                    ? 'border-[#1D1D1F] text-[#1D1D1F]'
+                    : 'border-transparent text-[#86868B] hover:text-[#1D1D1F] hover:border-[#C7C7CC]'
                 }`}
               >
                 {label}
@@ -147,12 +147,14 @@ export default async function ProjectPage({
             ))}
           </div>
 
-          {activeTab === 'personas' && (
-            <SynthesizePersonasButton projectId={id} />
-          )}
-          {activeTab === 'journey' && reqs.length > 0 && (
-            <GenerateJourneyButton projectId={id} hasStages={!!p.journey_stages?.length} />
-          )}
+          <div className="pb-2">
+            {activeTab === 'personas' && (
+              <SynthesizePersonasButton projectId={id} />
+            )}
+            {activeTab === 'journey' && reqs.length > 0 && (
+              <GenerateJourneyButton projectId={id} hasStages={!!p.journey_stages?.length} />
+            )}
+          </div>
         </div>
 
         {/* ── INPUTS TAB ── */}

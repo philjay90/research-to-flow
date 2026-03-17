@@ -574,10 +574,25 @@ export function JourneyMatrix({
   const [modalReqId, setModalReqId] = useState<string | null>(null)
   const [lastMove, setLastMove] = useState<LastMove | null>(null)
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const tableScrollRef = useRef<HTMLDivElement>(null)
+  const topScrollRef = useRef<HTMLDivElement>(null)
+  const phantomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setLocalReqs(requirements) }, [requirements])
   useEffect(() => { setLocalStages(stages ?? []) }, [stages])
   useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }, [])
+
+  // Keep top scrollbar phantom div width in sync with table scroll width
+  useEffect(() => {
+    const el = tableScrollRef.current
+    const phantom = phantomRef.current
+    if (!el || !phantom) return
+    const update = () => { phantom.style.width = `${el.scrollWidth}px` }
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const reqPersonaIds = useMemo(() => {
     const map = new Map<string, Set<string>>()
@@ -715,7 +730,25 @@ export function JourneyMatrix({
           {localStages.length} stages · {localReqs.length} requirements · {personas.length} personas
         </p>
 
-        <div className="overflow-x-auto rounded-2xl border border-[#E5E5EA]">
+        {/* Top scrollbar — synced with the table below */}
+        <div
+          ref={topScrollRef}
+          className="overflow-x-auto rounded-t-lg"
+          style={{ height: 14 }}
+          onScroll={(e) => {
+            if (tableScrollRef.current) tableScrollRef.current.scrollLeft = e.currentTarget.scrollLeft
+          }}
+        >
+          <div ref={phantomRef} style={{ height: 1 }} />
+        </div>
+
+        <div
+          ref={tableScrollRef}
+          className="overflow-x-auto rounded-2xl border border-[#E5E5EA] [&::-webkit-scrollbar]:hidden [scrollbar-width:none] [-ms-overflow-style:none]"
+          onScroll={(e) => {
+            if (topScrollRef.current) topScrollRef.current.scrollLeft = e.currentTarget.scrollLeft
+          }}
+        >
           <table className="min-w-full border-collapse">
             <thead>
               <tr className="bg-[#F5F5F7]">
