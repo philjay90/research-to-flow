@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/app/api/projects/[id]/flows/[personaId]/mockup/route.ts": {
+      "maxDuration": 60
+    }
+  }
+}

@@ -2,8 +2,8 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase'
 import { runUxDesignAgent } from '@/lib/agents/ux-design-agent'
 
-// Allow up to 5 minutes — the agent makes 3 sequential Claude API calls
-export const maxDuration = 300
+// Vercel Pro: allow up to 60s (well above the single Haiku call + Supabase overhead)
+export const maxDuration = 60
 
 export async function POST(
   _req: Request,
