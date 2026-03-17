@@ -103,6 +103,23 @@ export default async function ProjectPage({
   // Node count for "all requirements" flow (persona_id = null)
   const allReqNodeCount = nodes.filter((n) => n.persona_id === null).length
 
+  // Group inputs by type for the column layout (only types that actually have inputs)
+  const INPUT_TYPE_ORDER = ['interview_notes', 'transcript', 'screenshot', 'business_requirements', 'other'] as const
+  const INPUT_TYPE_LABELS: Record<string, string> = {
+    interview_notes:      'Interview Notes',
+    transcript:           'Transcripts',
+    screenshot:           'Screenshots',
+    business_requirements:'Business Requirements',
+    other:                'Other',
+  }
+  const inputsByType = new Map<string, ResearchInput[]>()
+  for (const input of ins) {
+    const group = inputsByType.get(input.type) ?? []
+    group.push(input)
+    inputsByType.set(input.type, group)
+  }
+  const activeInputTypes = INPUT_TYPE_ORDER.filter((t) => inputsByType.has(t))
+
   return (
     <>
       <AppHeader
@@ -168,28 +185,45 @@ export default async function ProjectPage({
             </div>
           ) : (
             <div className="space-y-6">
-              <ul className="space-y-3">
-                {ins.map((input) => {
-                  const synthAt = lastSynthAt.get(input.id)
-                  const isSynthesized = !!synthAt
-                  const isModified = isSynthesized && input.updated_at > synthAt!
-                  return (
-                    <li key={input.id}>
-                      <EditableInputCard
-                        inputId={input.id}
-                        projectId={id}
-                        type={input.type}
-                        sourceLabel={input.source_label}
-                        content={input.content}
-                        attachmentUrl={input.attachment_url}
-                        isSynthesized={isSynthesized}
-                        isModified={isModified}
-                        onDelete={deleteResearchInput.bind(null, input.id, id)}
-                      />
-                    </li>
-                  )
-                })}
-              </ul>
+              {/* Column layout — one column per type that has at least one input */}
+              <div className="flex gap-5 items-start overflow-x-auto pb-2">
+                {activeInputTypes.map((type) => (
+                  <div key={type} className="flex-1 min-w-[260px] space-y-3">
+                    {/* Column header */}
+                    <div className="flex items-center gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B]">
+                        {INPUT_TYPE_LABELS[type]}
+                      </p>
+                      <span className="text-[11px] text-[#86868B] opacity-60">
+                        {inputsByType.get(type)!.length}
+                      </span>
+                    </div>
+                    {/* Cards */}
+                    <ul className="space-y-3">
+                      {inputsByType.get(type)!.map((input) => {
+                        const synthAt = lastSynthAt.get(input.id)
+                        const isSynthesized = !!synthAt
+                        const isModified = isSynthesized && input.updated_at > synthAt!
+                        return (
+                          <li key={input.id}>
+                            <EditableInputCard
+                              inputId={input.id}
+                              projectId={id}
+                              type={input.type}
+                              sourceLabel={input.source_label}
+                              content={input.content}
+                              attachmentUrl={input.attachment_url}
+                              isSynthesized={isSynthesized}
+                              isModified={isModified}
+                              onDelete={deleteResearchInput.bind(null, input.id, id)}
+                            />
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
               <DeleteAllButton
                 action={deleteAllInputs.bind(null, id)}
                 label="Delete all inputs"
