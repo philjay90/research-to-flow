@@ -16,7 +16,7 @@ const INPUT_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
-export function AddInputButton({ projectId }: { projectId: string }) {
+export function AddInputButton({ projectId, flowId }: { projectId: string; flowId?: string }) {
   const router = useRouter()
   const [isOpen, setIsOpen] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -98,6 +98,7 @@ export function AddInputButton({ projectId }: { projectId: string }) {
 
               <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
                 <input type="hidden" name="project_id" value={projectId} />
+                {flowId && <input type="hidden" name="flow_id" value={flowId} />}
 
                 <div className="space-y-1.5">
                   <Label htmlFor="ai-type" className="text-sm font-semibold text-[#1D1D1F]">

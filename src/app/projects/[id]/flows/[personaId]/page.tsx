@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase'
-import type { Project, Persona, Requirement, PersonaRequirement, FlowNode, FlowEdge } from '@/types'
+import type { Project, Persona, Requirement, PersonaRequirement, ResearchInput, FlowNode, FlowEdge } from '@/types'
 import { AppHeader } from '@/app/components/AppHeader'
 import { ProvenanceLegend } from '@/app/components/ProvenanceDot'
 import { HelpTooltip } from '@/app/components/HelpTooltip'
@@ -9,6 +9,20 @@ import { GenerateJourneyButton } from '@/app/components/GenerateJourneyButton'
 import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { PersonaDetailClient } from '../../personas/[personaId]/PersonaDetailClient'
 import { FlowCanvasWrapper } from '@/app/components/FlowCanvasWrapper'
+import { AddInputButton } from '@/app/components/AddInputButton'
+import { SynthesizeFlowButton } from '@/app/components/SynthesizeFlowButton'
+import { EditableInputCard } from '@/app/components/EditableInputCard'
+import { DeleteAllButton } from '@/app/components/DeleteAllButton'
+import { deleteResearchInput, deleteAllFlowInputs } from '@/app/actions'
+
+const INPUT_TYPE_ORDER = ['interview_notes', 'transcript', 'screenshot', 'business_requirements', 'other'] as const
+const INPUT_TYPE_LABELS: Record<string, string> = {
+  interview_notes: 'Interview Notes',
+  transcript: 'Transcripts',
+  screenshot: 'Screenshots',
+  business_requirements: 'Business Requirements',
+  other: 'Other',
+}
 
 export default async function FlowDetailPage({
   params,
@@ -18,14 +32,15 @@ export default async function FlowDetailPage({
   searchParams: Promise<{ tab?: string }>
 }) {
   const { id, personaId } = await params
-  const { tab = 'user-group' } = await searchParams
+  const { tab = 'inputs' } = await searchParams
   const supabase = await createClient()
 
-  // Fetch project + persona + requirements in parallel (requirements needed for downstream queries)
+  // Fetch project + persona + requirements in parallel
   const [
     { data: project, error: projectError },
     { data: persona, error: personaError },
     { data: allRequirements },
+    { data: flowInputsRaw },
   ] = await Promise.all([
     supabase.from('project').select('*').eq('id', id).single(),
     supabase.from('persona').select('*').eq('id', personaId).single(),
@@ -34,6 +49,12 @@ export default async function FlowDetailPage({
       .select('*')
       .eq('project_id', id)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('research_input')
+      .select('*')
+      .eq('project_id', id)
+      .eq('flow_id', personaId)
+      .order('created_at', { ascending: true }),
   ])
 
   if (projectError || !project || personaError || !persona) notFound()
@@ -41,9 +62,10 @@ export default async function FlowDetailPage({
   const p = project as Project
   const pers = persona as Persona
   const reqs = (allRequirements ?? []) as Requirement[]
+  const ins = (flowInputsRaw ?? []) as ResearchInput[]
   const reqIds = reqs.map((r) => r.id)
 
-  // Fetch the remaining data in parallel (all depend on reqIds or personaId)
+  // Fetch the remaining data in parallel
   const [
     { data: personaLinks },
     { data: allProjectLinks },
@@ -103,9 +125,28 @@ export default async function FlowDetailPage({
 
   const personaReqLinks = (allPersonaReqLinks ?? []) as { persona_id: string; requirement_id: string }[]
 
-  const activeTab = ['persona', 'journey', 'canvas'].includes(tab) ? tab : 'persona'
+  // Build requirementId → synthesis timestamp map (for isSynthesized / isModified on input cards)
+  const lastSynthAt = new Map<string, string>()
+  for (const req of reqs) {
+    for (const srcId of req.source_input_ids) {
+      const existing = lastSynthAt.get(srcId)
+      if (!existing || req.created_at > existing) lastSynthAt.set(srcId, req.created_at)
+    }
+  }
+
+  // Column layout for inputs tab
+  const inputsByType = new Map<string, ResearchInput[]>()
+  for (const input of ins) {
+    const group = inputsByType.get(input.type) ?? []
+    group.push(input)
+    inputsByType.set(input.type, group)
+  }
+  const activeInputTypes = INPUT_TYPE_ORDER.filter((t) => inputsByType.has(t))
+
+  const activeTab = ['inputs', 'persona', 'journey', 'canvas'].includes(tab) ? tab : 'inputs'
 
   const TAB_HELP: Record<string, string> = {
+    inputs: 'Research inputs specific to this flow. Add inputs here, then click Synthesize to generate the persona.',
     persona: 'The persona this flow is built around, including their goals and pain points.',
     journey: 'The user journey stages and linked requirements for this flow.',
     canvas: 'The happy path flow canvas for this persona.',
@@ -117,7 +158,7 @@ export default async function FlowDetailPage({
     <>
       <AppHeader
         crumbs={[
-          { label: p.name, href: `/projects/${id}?tab=flows` },
+          { label: p.name, href: `/projects/${id}` },
           { label: pers.name },
         ]}
       />
@@ -127,10 +168,11 @@ export default async function FlowDetailPage({
         <div className="flex items-end justify-between border-b border-[#E5E5EA] mb-8">
           <div className="flex items-end">
             {[
-              { key: 'persona',    label: 'Persona' },
-              { key: 'journey',    label: 'Journey' },
-              { key: 'canvas',     label: 'Canvas' },
-            ].map(({ key, label }) => (
+              { key: 'inputs',  label: 'Inputs',  count: ins.length },
+              { key: 'persona', label: 'Persona',  count: 0 },
+              { key: 'journey', label: 'Journey',  count: 0 },
+              { key: 'canvas',  label: 'Canvas',   count: 0 },
+            ].map(({ key, label, count }) => (
               <Link
                 key={key}
                 href={`/projects/${id}/flows/${personaId}?tab=${key}`}
@@ -141,12 +183,19 @@ export default async function FlowDetailPage({
                 }`}
               >
                 {label}
+                {count > 0 && <span className="text-xs opacity-60">{count}</span>}
                 <HelpTooltip text={TAB_HELP[key]} position="bottom" />
               </Link>
             ))}
           </div>
 
           <div className="pb-2">
+            {activeTab === 'inputs' && (
+              <div className="flex items-center gap-2">
+                <SynthesizeFlowButton projectId={id} personaId={personaId} />
+                <AddInputButton projectId={id} flowId={personaId} />
+              </div>
+            )}
             {activeTab === 'journey' && (
               <GenerateJourneyButton
                 projectId={id}
@@ -155,6 +204,63 @@ export default async function FlowDetailPage({
             )}
           </div>
         </div>
+
+        {/* ── INPUTS TAB ── */}
+        {activeTab === 'inputs' && (
+          ins.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20 text-center shadow-sm">
+              <p className="text-lg font-medium text-[#1D1D1F]">No inputs yet</p>
+              <p className="mt-2 text-sm text-[#86868B] max-w-sm">
+                Add research inputs like interview notes, transcripts, or screenshots.
+                Then click <span className="font-medium">✦ Synthesize</span> to generate the persona.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex gap-5 items-start overflow-x-auto pb-2">
+                {activeInputTypes.map((type) => (
+                  <div key={type} className="flex-1 min-w-[260px] space-y-3">
+                    <div className="flex items-center gap-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-[#86868B]">
+                        {INPUT_TYPE_LABELS[type]}
+                      </p>
+                      <span className="text-[11px] text-[#86868B] opacity-60">
+                        {inputsByType.get(type)!.length}
+                      </span>
+                    </div>
+                    <ul className="space-y-3">
+                      {inputsByType.get(type)!.map((input) => {
+                        const synthAt = lastSynthAt.get(input.id)
+                        const isSynthesized = !!synthAt
+                        const isModified = isSynthesized && input.updated_at > synthAt!
+                        return (
+                          <li key={input.id}>
+                            <EditableInputCard
+                              inputId={input.id}
+                              projectId={id}
+                              type={input.type}
+                              sourceLabel={input.source_label}
+                              content={input.content}
+                              attachmentUrl={input.attachment_url}
+                              isSynthesized={isSynthesized}
+                              isModified={isModified}
+                              onDelete={deleteResearchInput.bind(null, input.id, id, personaId)}
+                            />
+                          </li>
+                        )
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+              <DeleteAllButton
+                action={deleteAllFlowInputs.bind(null, personaId, id)}
+                label="Delete all inputs"
+                confirmMessage="Delete ALL inputs for this flow? This cannot be undone."
+              />
+            </div>
+          )
+        )}
 
         {/* ── PERSONA TAB ── */}
         {activeTab === 'persona' && (
@@ -196,7 +302,7 @@ export default async function FlowDetailPage({
             <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20 text-center shadow-sm">
               <p className="text-lg font-medium text-[#1D1D1F]">No requirements yet</p>
               <p className="mt-2 text-sm text-[#86868B] max-w-sm">
-                Synthesize flows from your inputs first, then generate the journey.
+                Add inputs and synthesize the persona first to generate requirements.
               </p>
             </div>
           ) : (

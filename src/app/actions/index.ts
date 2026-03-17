@@ -265,6 +265,7 @@ export async function addResearchInput(formData: FormData) {
   if (!user) return
 
   const projectId = formData.get('project_id') as string
+  const flowId = (formData.get('flow_id') as string) || null
   const type = formData.get('type') as string
   const content = formData.get('content') as string
   const sourceLabel = formData.get('source_label') as string
@@ -295,7 +296,7 @@ export async function addResearchInput(formData: FormData) {
 
   const { error } = await supabase.from('research_input').insert({
     project_id: projectId,
-    flow_id: null,
+    flow_id: flowId,
     type,
     content: content.trim(),
     source_label: sourceLabel?.trim() || null,
@@ -309,12 +310,21 @@ export async function addResearchInput(formData: FormData) {
   }
 
   revalidatePath(`/projects/${projectId}`)
+  if (flowId) revalidatePath(`/projects/${projectId}/flows/${flowId}`)
 }
 
-export async function deleteResearchInput(inputId: string, projectId: string) {
+export async function deleteResearchInput(inputId: string, projectId: string, flowId?: string | null) {
   const { supabase } = await getClientAndUser()
   await supabase.from('research_input').delete().eq('id', inputId)
   revalidatePath(`/projects/${projectId}`)
+  if (flowId) revalidatePath(`/projects/${projectId}/flows/${flowId}`)
+}
+
+export async function deleteAllFlowInputs(personaId: string, projectId: string) {
+  const { supabase } = await getClientAndUser()
+  await supabase.from('research_input').delete().eq('flow_id', personaId)
+  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/flows/${personaId}`)
 }
 
 export async function updateResearchInput(
@@ -1033,6 +1043,213 @@ ${existingPersonasSummary}`,
   }
 
   revalidatePath(`/projects/${projectId}`)
+  return { success: true }
+}
+
+// ---------------------------------------------------------------------------
+// Create an empty persona/flow (used by "Add Flow" at project level)
+// ---------------------------------------------------------------------------
+
+export async function createEmptyPersona(projectId: string): Promise<{ id?: string; error?: string }> {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  const { data, error } = await supabase
+    .from('persona')
+    .insert({
+      project_id: projectId,
+      user_id: user.id,
+      name: 'New Flow',
+      role_title: '',
+      background: '',
+      tools: '',
+      macro_goals: '',
+      tasks_activities: '',
+      pain_points: '',
+      field_provenance: {},
+      source_input_ids: [],
+      status: 'active',
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    console.error('Failed to create flow:', error)
+    return { error: 'Failed to create flow' }
+  }
+
+  revalidatePath(`/projects/${projectId}`)
+  return { id: data.id }
+}
+
+// ---------------------------------------------------------------------------
+// Synthesize a single flow's persona from its own inputs
+// ---------------------------------------------------------------------------
+
+export async function synthesizeFlow(
+  projectId: string,
+  personaId: string
+): Promise<{ error?: string; success?: boolean }> {
+  const { supabase, user } = await getClientAndUser()
+  if (!user) return { error: 'Not authenticated' }
+
+  // Inputs scoped to this flow
+  const { data: inputs } = await supabase
+    .from('research_input')
+    .select('id, type, content, source_label')
+    .eq('project_id', projectId)
+    .eq('flow_id', personaId)
+
+  if (!inputs || inputs.length === 0) {
+    return { error: 'No inputs found for this flow. Add inputs first.' }
+  }
+
+  // Existing persona to update
+  const { data: persona } = await supabase
+    .from('persona')
+    .select('*')
+    .eq('id', personaId)
+    .single()
+
+  if (!persona) return { error: 'Flow not found' }
+
+  // All project requirements (for linking)
+  const { data: requirements } = await supabase
+    .from('requirement')
+    .select('id, user_story, business_opportunity, dfv_tag')
+    .eq('project_id', projectId)
+
+  const inputsSummary = inputs
+    .map(
+      (inp) =>
+        `[Input ID: ${inp.id}]\nType: ${inp.type}${inp.source_label ? `\nSource: ${inp.source_label}` : ''}\nContent: ${inp.content}`
+    )
+    .join('\n\n---\n\n')
+
+  const requirementsSummary =
+    requirements && requirements.length > 0
+      ? requirements
+          .map(
+            (r) =>
+              `[Requirement ID: ${r.id}]\nUser story: ${r.user_story}\nBusiness opportunity: ${r.business_opportunity}\nDFV: ${r.dfv_tag ?? 'unclassified'}`
+          )
+          .join('\n\n')
+      : 'No requirements yet.'
+
+  const message = await anthropic.messages.create({
+    model: 'claude-opus-4-5-20251101',
+    max_tokens: 4096,
+    messages: [
+      {
+        role: 'user',
+        content: `You are a UX researcher updating a user persona from research data.
+
+Analyse the research inputs below and update the persona's fields accordingly.
+
+RULES:
+- Update all fields based on the research inputs provided
+- For field_provenance, set source to "data" if the value is directly stated in the research, or "llm_inferred" if you are inferring it
+- source_input_ids: list the Input IDs that informed this persona
+- requirement_ids: list Requirement IDs most relevant to this persona
+
+For multiline fields (background, tools, macro_goals, tasks_activities, pain_points), write each distinct point or item on its own line. Do not use bullet characters, hyphens, or numbers — just plain text lines separated by \\n.
+
+Return ONLY a JSON object (not an array). No explanation, no markdown, no code fences. The object must have this exact shape:
+{
+  "name": "First name or persona name",
+  "role_title": "Job title or role",
+  "background": "Line 1\\nLine 2",
+  "tools": "Tool A\\nTool B",
+  "macro_goals": "Goal 1\\nGoal 2",
+  "tasks_activities": "Task 1\\nTask 2",
+  "pain_points": "Pain point 1\\nPain point 2",
+  "source_input_ids": ["input-id-1"],
+  "requirement_ids": ["req-id-1"],
+  "field_provenance": {
+    "name": { "source": "data", "input_ids": ["input-id"] },
+    "role_title": { "source": "llm_inferred", "input_ids": ["input-id"] },
+    "background": { "source": "data", "input_ids": ["input-id"] },
+    "tools": { "source": "data", "input_ids": ["input-id"] },
+    "macro_goals": { "source": "llm_inferred", "input_ids": ["input-id"] },
+    "tasks_activities": { "source": "data", "input_ids": ["input-id"] },
+    "pain_points": { "source": "data", "input_ids": ["input-id"] }
+  }
+}
+
+--- RESEARCH INPUTS ---
+${inputsSummary}
+
+--- REQUIREMENTS ---
+${requirementsSummary}`,
+      },
+    ],
+  })
+
+  const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
+
+  type PersonaResult = {
+    name: string
+    role_title: string
+    background: string
+    tools: string
+    macro_goals: string
+    tasks_activities: string
+    pain_points: string
+    source_input_ids: string[]
+    requirement_ids: string[]
+    field_provenance: Record<string, { source: string; input_ids: string[] }>
+  }
+
+  let result: PersonaResult
+
+  try {
+    const cleaned = responseText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+    result = JSON.parse(cleaned)
+  } catch (e) {
+    console.error('Failed to parse Claude flow synthesis response:', responseText, e)
+    return { error: 'Failed to parse synthesis result from Claude' }
+  }
+
+  // Merge provenance — preserve manually-edited fields
+  const existingProvenance: Record<string, { source: string; input_ids: string[] }> =
+    persona.field_provenance ?? {}
+
+  const updates: Record<string, unknown> = {
+    source_input_ids: result.source_input_ids,
+    updated_at: new Date().toISOString(),
+  }
+  const newProvenance = { ...existingProvenance }
+
+  for (const field of PERSONA_FIELDS) {
+    if (existingProvenance[field]?.source === 'manual') {
+      // Preserve manually edited fields
+    } else {
+      updates[field] = result[field as keyof PersonaResult]
+      newProvenance[field] = result.field_provenance[field] ?? { source: 'llm_inferred', input_ids: [] }
+    }
+  }
+  updates.field_provenance = newProvenance
+
+  await supabase.from('persona').update(updates).eq('id', personaId)
+
+  // Update requirement links
+  if (result.requirement_ids?.length > 0) {
+    await supabase
+      .from('persona_requirement')
+      .delete()
+      .eq('persona_id', personaId)
+      .eq('link_source', 'llm')
+
+    const reqLinks = result.requirement_ids.map((reqId) => ({
+      persona_id: personaId,
+      requirement_id: reqId,
+      link_source: 'llm',
+    }))
+    await supabase.from('persona_requirement').upsert(reqLinks, { onConflict: 'persona_id,requirement_id' })
+  }
+
+  revalidatePath(`/projects/${projectId}`)
+  revalidatePath(`/projects/${projectId}/flows/${personaId}`)
   return { success: true }
 }
 
