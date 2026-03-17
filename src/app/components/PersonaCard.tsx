@@ -1,4 +1,5 @@
-import Link from 'next/link'
+'use client'
+
 import type { Persona } from '@/types'
 import { ProvenanceDot } from './ProvenanceDot'
 import { DeleteButton } from './DeleteButton'
@@ -7,18 +8,19 @@ import { deletePersona } from '@/app/actions'
 interface PersonaCardProps {
   persona: Persona
   projectId: string
+  onOpen: () => void
 }
 
-export function PersonaCard({ persona, projectId }: PersonaCardProps) {
+export function PersonaCard({ persona, projectId, onOpen }: PersonaCardProps) {
   const provenance = persona.field_provenance ?? {}
 
   return (
     <div className="rounded-2xl bg-white shadow-sm p-5 flex flex-col gap-3">
       {/* Header row */}
       <div className="flex items-start justify-between gap-4">
-        <Link
-          href={`/projects/${projectId}/personas/${persona.id}`}
-          className="min-w-0 flex-1 group"
+        <button
+          onClick={onOpen}
+          className="min-w-0 flex-1 text-left group"
         >
           <div className="flex items-center gap-2">
             <ProvenanceDot source={provenance.name?.source ?? 'llm_inferred'} />
@@ -29,15 +31,15 @@ export function PersonaCard({ persona, projectId }: PersonaCardProps) {
           {persona.role_title && (
             <p className="mt-0.5 ml-[18px] text-sm text-[#86868B]">{persona.role_title}</p>
           )}
-        </Link>
+        </button>
 
         <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href={`/projects/${projectId}/personas/${persona.id}`}
+          <button
+            onClick={onOpen}
             className="flex h-7 items-center rounded-full border border-[#1D1D1F] px-3 text-xs font-medium text-[#1D1D1F] hover:bg-[#1D1D1F] hover:text-white transition-colors"
           >
             View →
-          </Link>
+          </button>
           <DeleteButton
             action={deletePersona.bind(null, persona.id, projectId)}
             confirmMessage={`Delete "${persona.name}"? This cannot be undone.`}

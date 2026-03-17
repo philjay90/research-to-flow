@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase'
 import {
   addResearchInput,
   deleteResearchInput,
-  updateProject,
   deleteAllInputs,
 } from '@/app/actions'
 import type { Project, ResearchInput, Requirement, Persona } from '@/types'
@@ -13,12 +12,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/app/components/AppHeader'
-import { EditableHeader } from '@/app/components/EditableHeader'
 import { DeleteAllButton } from '@/app/components/DeleteAllButton'
 import { EditableInputCard } from '@/app/components/EditableInputCard'
-import { PersonaCard } from '@/app/components/PersonaCard'
+import { PersonasTabClient } from '@/app/components/PersonasTabClient'
 import { SynthesizePersonasButton } from '@/app/components/SynthesizePersonasButton'
-import { ProvenanceLegend } from '@/app/components/ProvenanceDot'
 import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { GenerateJourneyButton } from '@/app/components/GenerateJourneyButton'
@@ -73,7 +70,7 @@ export default async function ProjectPage({
       .order('created_at', { ascending: true }),
     supabase
       .from('persona_requirement')
-      .select('persona_id, requirement_id'),
+      .select('persona_id, requirement_id, link_source'),
   ])
 
   const p = project as Project
@@ -114,13 +111,6 @@ export default async function ProjectPage({
       />
 
       <main className="px-8 py-12">
-        {/* Editable project title + description */}
-        <EditableHeader
-          name={p.name}
-          description={p.description}
-          onSave={updateProject.bind(null, p.id)}
-        />
-
         {/* Tab switcher */}
         <div className="mb-8 flex items-end justify-between border-b border-[#E5E5EA]">
           <div className="flex items-end">
@@ -310,18 +300,12 @@ export default async function ProjectPage({
                 </p>
               </div>
             ) : (
-              <>
-                <div className="mb-4">
-                  <ProvenanceLegend />
-                </div>
-                <ul className="space-y-4">
-                  {personaList.map((persona) => (
-                    <li key={persona.id}>
-                      <PersonaCard persona={persona} projectId={id} />
-                    </li>
-                  ))}
-                </ul>
-              </>
+              <PersonasTabClient
+                personas={personaList}
+                projectId={id}
+                allRequirements={reqs}
+                personaReqLinks={(personaReqLinks ?? []) as { persona_id: string; requirement_id: string; link_source?: 'llm' | 'manual' }[]}
+              />
             )}
           </>
         )}
