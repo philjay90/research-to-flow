@@ -320,8 +320,8 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[56px] space-y-2 rounded-lg p-1 transition-colors duration-100 ${
-        isOver ? 'bg-[#EFF6FF] ring-1 ring-inset ring-[#BFDBFE]' : ''
+      className={`min-h-[110px] w-full space-y-2 p-3 transition-colors duration-150 ${
+        isOver ? 'bg-[#DBEAFE] ring-2 ring-inset ring-[#3B82F6]' : ''
       }`}
     >
       {children}
@@ -339,12 +339,14 @@ function RequirementMiniCard({
   initialLinkedPersonaIds,
   projectId,
   onOpenModal,
+  isDropped,
 }: {
   requirement: Requirement
   personas: Persona[]
   initialLinkedPersonaIds: Set<string>
   projectId: string
   onOpenModal: () => void
+  isDropped?: boolean
 }) {
   const router = useRouter()
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -387,7 +389,7 @@ function RequirementMiniCard({
     <div
       ref={setNodeRef}
       {...attributes}
-      className="rounded-xl border border-[#E5E5EA] bg-white text-sm overflow-hidden"
+      className={`rounded-xl border border-[#E5E5EA] bg-white text-sm overflow-hidden ${isDropped ? 'card-drop-in' : ''}`}
       style={{ opacity: isDragging ? 0.25 : 1, touchAction: 'none' }}
     >
       {/* Drag handle + modal trigger */}
@@ -573,7 +575,9 @@ export function JourneyMatrix({
   const [activeReqId, setActiveReqId] = useState<string | null>(null)
   const [modalReqId, setModalReqId] = useState<string | null>(null)
   const [lastMove, setLastMove] = useState<LastMove | null>(null)
+  const [droppedReqId, setDroppedReqId] = useState<string | null>(null)
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const dropClearRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const tableScrollRef = useRef<HTMLDivElement>(null)
   const topScrollRef = useRef<HTMLDivElement>(null)
   const phantomRef = useRef<HTMLDivElement>(null)
@@ -623,6 +627,11 @@ export function JourneyMatrix({
 
     // Optimistic update
     setLocalReqs((prev) => prev.map((r) => (r.id === reqId ? { ...r, journey_stage: newStage } : r)))
+
+    // Trigger drop-in animation on the landed card
+    setDroppedReqId(reqId)
+    if (dropClearRef.current) clearTimeout(dropClearRef.current)
+    dropClearRef.current = setTimeout(() => setDroppedReqId(null), 600)
 
     // Record move for undo
     setLastMove({
@@ -790,7 +799,7 @@ export function JourneyMatrix({
                       return (
                         <td
                           key={col}
-                          className={`border-b border-r border-[#E5E5EA] last:border-r-0 px-3 py-3 align-top ${rowIdx === rows.length - 1 ? 'border-b-0' : ''}`}
+                          className={`border-b border-r border-[#E5E5EA] last:border-r-0 p-0 align-top ${rowIdx === rows.length - 1 ? 'border-b-0' : ''}`}
                         >
                           <DroppableCell id={droppableId}>
                             {cellReqs.map((req) => (
@@ -801,6 +810,7 @@ export function JourneyMatrix({
                                 initialLinkedPersonaIds={reqPersonaIds.get(req.id) ?? new Set()}
                                 projectId={projectId}
                                 onOpenModal={() => setModalReqId(req.id)}
+                                isDropped={req.id === droppedReqId}
                               />
                             ))}
                           </DroppableCell>
