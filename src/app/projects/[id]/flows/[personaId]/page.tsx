@@ -8,10 +8,7 @@ import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { GenerateJourneyButton } from '@/app/components/GenerateJourneyButton'
 import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { PersonaDetailClient } from '../../personas/[personaId]/PersonaDetailClient'
-import dynamic from 'next/dynamic'
-
-// FlowCanvas uses browser APIs — load client-side only
-const FlowCanvas = dynamic(() => import('@/app/components/FlowCanvas'), { ssr: false })
+import { FlowCanvasWrapper } from '@/app/components/FlowCanvasWrapper'
 
 export default async function FlowDetailPage({
   params,
@@ -219,7 +216,7 @@ export default async function FlowDetailPage({
             className="rounded-2xl overflow-hidden border border-[#E5E5EA]"
             style={{ height: 'calc(100vh - 185px)' }}
           >
-            <FlowCanvas
+            <FlowCanvasWrapper
               projectId={id}
               initialPersonaId={personaId}
               initialNodes={nodes}
