@@ -211,13 +211,10 @@ export function JourneyMatrix({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[#86868B]">
-          {stages.length} stages · {requirements.length} requirements · {personas.length} personas
-        </p>
-        <GenerateJourneyButton projectId={projectId} hasStages={true} />
-      </div>
+      {/* Stats */}
+      <p className="text-xs text-[#86868B]">
+        {stages.length} stages · {requirements.length} requirements · {personas.length} personas
+      </p>
 
       {/* Scrollable matrix */}
       <div className="overflow-x-auto rounded-2xl border border-[#E5E5EA]">
