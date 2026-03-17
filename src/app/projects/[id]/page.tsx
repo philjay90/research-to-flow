@@ -6,6 +6,8 @@ import { FlowsTabClient } from '@/app/components/FlowsTabClient'
 import { AddFlowButton } from '@/app/components/AddFlowButton'
 import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { ResearchPanel } from '@/app/components/ResearchPanel'
+import { ProjectEditableHeader } from '@/app/components/ProjectEditableHeader'
+import { updateProject, refreshUxResearch } from '@/app/actions'
 
 export default async function ProjectPage({
   params,
@@ -50,6 +52,14 @@ export default async function ProjectPage({
       <AppHeader crumbs={[{ label: p.name }]} />
 
       <main className="px-8 py-12">
+
+        <ProjectEditableHeader
+          name={p.name}
+          description={p.description ?? null}
+          onSave={updateProject.bind(null, id)}
+          showRefreshResearch={showResearch && !!p.ux_research_brief}
+          onRefreshResearch={refreshUxResearch.bind(null, id)}
+        />
 
         {/* ── Tab bar (only shown when research is enabled) ── */}
         {showResearch && (

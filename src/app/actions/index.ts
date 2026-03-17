@@ -232,6 +232,39 @@ export async function rerunUxResearch(projectId: string): Promise<{ error?: stri
   return {}
 }
 
+export async function refreshUxResearch(projectId: string): Promise<{ error?: string }> {
+  const { supabase } = await getClientAndUser()
+  const { data: project } = await supabase
+    .from('project')
+    .select('name, description, ux_research_brief')
+    .eq('id', projectId)
+    .single()
+
+  if (!project) return { error: 'Project not found' }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (!(project as any).ux_research_brief) return { error: 'No existing research to refresh' }
+
+  await supabase
+    .from('project')
+    .update({ research_status: 'pending' })
+    .eq('id', projectId)
+
+  import('@/lib/agents/ux-research-agent')
+    .then(({ reviewUxResearchAgent }) =>
+      reviewUxResearchAgent({
+        projectId,
+        name: project.name,
+        description: project.description,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        existingBrief: (project as any).ux_research_brief,
+      })
+    )
+    .catch(console.error)
+
+  revalidatePath(`/projects/${projectId}`)
+  return {}
+}
+
 export async function deleteProject(projectId: string) {
   const { supabase } = await getClientAndUser()
   await supabase.from('project').delete().eq('id', projectId)
