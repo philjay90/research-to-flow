@@ -39,7 +39,7 @@ export async function runUxDesignAgent({
   try {
     // Step 1: Visual Direction
     const directionRes = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 1000,
       system: DESIGN_SYSTEMS_KB,
       messages: [
@@ -60,7 +60,7 @@ Return JSON: { "style": string, "color_emphasis": string, "layout_approach": str
 
     // Step 2: Screen Specs
     const screensRes = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
+      model: 'claude-3-5-haiku-20241022',
       max_tokens: 2000,
       system: DESIGN_SYSTEMS_KB,
       messages: [
