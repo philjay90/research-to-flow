@@ -76,6 +76,7 @@ export function EditableRequirementCard({
   const [oppVal, setOppVal] = useState(businessOpportunity)
   const [criteriaVal, setCriteriaVal] = useState<string[]>(acceptanceCriteria)
   const [dfvVal, setDfvVal] = useState(dfvTag ?? '')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [personaActionId, setPersonaActionId] = useState<string | null>(null)
   const [showPersonaPicker, setShowPersonaPicker] = useState(false)
@@ -119,7 +120,7 @@ export function EditableRequirementCard({
     })
   }
 
-  function handleCancel() { setEditing(false) }
+  function handleCancel() { setEditing(false); setConfirmingDelete(false) }
   function addCriterion() { setCriteriaVal((prev) => [...prev, '']) }
   function removeCriterion(i: number) { setCriteriaVal((prev) => prev.filter((_, idx) => idx !== i)) }
   function updateCriterion(i: number, v: string) { setCriteriaVal((prev) => prev.map((c, idx) => idx === i ? v : c)) }
@@ -218,15 +219,37 @@ export function EditableRequirementCard({
           </button>
         </div>
 
-        <div className="flex gap-2 pt-1">
-          <Button onClick={handleSave} disabled={isPending || !storyVal.trim()}
-            className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-4 font-semibold h-7 text-xs">
-            {isPending ? <LoadingDots /> : 'Save'}
-          </Button>
-          <Button onClick={handleCancel} variant="ghost" className="rounded-full text-foreground h-7 text-xs">
-            Cancel
-          </Button>
-        </div>
+        {confirmingDelete ? (
+          <div className="flex items-center gap-3 pt-1 rounded-xl bg-red-50 px-3 py-2">
+            <span className="text-xs text-red-600 flex-1">Delete this requirement? This cannot be undone.</span>
+            <Button
+              onClick={() => startTransition(async () => { await onDelete(); router.refresh() })}
+              disabled={isPending}
+              className="bg-red-600 text-white hover:bg-red-700 rounded-full px-3 font-semibold h-7 text-xs"
+            >
+              {isPending ? <LoadingDots /> : 'Yes, delete'}
+            </Button>
+            <Button onClick={() => setConfirmingDelete(false)} variant="ghost" className="rounded-full h-7 text-xs text-foreground">
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 pt-1">
+            <Button onClick={handleSave} disabled={isPending || !storyVal.trim()}
+              className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-4 font-semibold h-7 text-xs">
+              {isPending ? <LoadingDots /> : 'Save'}
+            </Button>
+            <Button onClick={handleCancel} variant="ghost" className="rounded-full text-foreground h-7 text-xs">
+              Cancel
+            </Button>
+            <button
+              onClick={() => setConfirmingDelete(true)}
+              className="ml-auto text-xs text-red-400 hover:text-red-600 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        )}
       </div>
     )
   }
