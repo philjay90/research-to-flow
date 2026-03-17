@@ -14,7 +14,7 @@ const NODE_H_DECISION = 120
 // ── Journey swim-lane layout constants ────────────────────────────────────────
 // These must stay in sync with LANE_HEADER_W / CROSS_FORWARD_THRESHOLD in FlowCanvas.tsx
 const COLUMN_W = 300        // column content width (px)
-const COLUMN_GAP = 60       // horizontal gap between columns
+const COLUMN_GAP = 160      // horizontal gap between columns — wide enough for edge routing
 const COLUMN_TOTAL = COLUMN_W + COLUMN_GAP
 const CONTENT_START_Y = 120 // Y where flow nodes begin (below the lane header)
 

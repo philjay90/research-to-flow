@@ -12,6 +12,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getSmoothStepPath,
+  getBezierPath,
   type Node,
   type Edge,
   type EdgeProps,
@@ -136,11 +137,11 @@ function LabelledEdge({
   const isBackEdge = !!(data as Record<string, unknown>)?.isBackEdge
   const isCrossForward = !!(data as Record<string, unknown>)?.isCrossForward
 
-  const [edgePath] = getSmoothStepPath({
-    sourceX, sourceY, sourcePosition,
-    targetX, targetY, targetPosition,
-    borderRadius: 8,
-  })
+  // Cross-column forward edges use a bezier arc so they don't step horizontally
+  // through intermediate column nodes. Back-edges and normal edges use smooth-step.
+  const [edgePath] = isCrossForward
+    ? getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition })
+    : getSmoothStepPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, borderRadius: 8 })
 
   // Label positioning:
   // - cross-forward: centered horizontally between source and target, above
