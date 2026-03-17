@@ -127,10 +127,9 @@ export function MockupPanel({
     const STEPS = [
       'Analysing design direction',
       'Generating screen specs',
-      'Building HTML prototype',
     ]
-    // Estimate step based on elapsed time (~30s per step)
-    const estimatedStep = Math.min(Math.floor(elapsed / 30), 2)
+    // Estimate step based on elapsed time (~25s per step)
+    const estimatedStep = Math.min(Math.floor(elapsed / 25), 1)
 
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm">

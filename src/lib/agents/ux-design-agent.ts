@@ -79,23 +79,8 @@ Return JSON array: [{ "screen_id": string, "title": string, "layout": string, "c
     })
     const screens = parseJson(screensRes)
 
-    // Step 3: HTML Prototype
-    const protoRes = await anthropic.messages.create({
-      model: 'claude-opus-4-5-20251101',
-      max_tokens: 4000,
-      system: DESIGN_SYSTEMS_KB,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate a single-file HTML prototype implementing the screen specs using Tailwind CSS CDN. All screens navigable via buttons. No external images. Return ONLY the raw HTML string — no JSON wrapper, no markdown code block.
-
-Screens: ${JSON.stringify(screens)}
-Visual direction: ${JSON.stringify(visualDirection)}
-Persona name: ${typedPersona.name}`,
-        },
-      ],
-    })
-    const prototypeHtml = protoRes.content[0].type === 'text' ? protoRes.content[0].text : ''
+    // Step 3: HTML Prototype (deterministic — built from screen specs, no LLM call)
+    const prototypeHtml = buildPrototypeHtml(screens, visualDirection, typedPersona.name)
 
     // Step 4: Figma JSON (deterministic — no LLM call)
     const figmaJson = buildFigmaJson(screens, visualDirection, typedPersona.name)
@@ -137,6 +122,88 @@ function buildCanvasSummary(nodes: FlowNode[], reqs: Requirement[]): string {
       return `[${n.type}] ${n.label}${req ? ` (${req.user_story})` : ''}`
     })
     .join('\n')
+}
+
+function buildPrototypeHtml(
+  screens: unknown[],
+  direction: unknown,
+  personaName: string
+): string {
+  const typedScreens = screens as Record<string, unknown>[]
+  const dir = direction as Record<string, unknown>
+
+  const screenDivs = typedScreens.map((screen, i) => {
+    const components = (Array.isArray(screen.components)
+      ? (screen.components as Record<string, unknown>[])
+      : []
+    )
+    const componentHtml = components.map((c) => {
+      const label = String(c.label ?? c.type ?? 'Action')
+      const type = String(c.type ?? 'button').toLowerCase()
+      if (type === 'input' || type === 'text_input' || type === 'search') {
+        return `<input class="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-300" placeholder="${label}" />`
+      }
+      if (type === 'text' || type === 'heading' || type === 'label' || type === 'description') {
+        return `<p class="text-sm text-gray-600">${label}</p>`
+      }
+      if (type === 'list' || type === 'list_item') {
+        return `<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm text-gray-800 shadow-sm">${label}</div>`
+      }
+      // Default: navigable button
+      const nextIdx = i < typedScreens.length - 1 ? i + 1 : i
+      return `<button onclick="showScreen(${nextIdx})" class="w-full rounded-full bg-[#1D1D1F] px-5 py-3 text-sm font-semibold text-white hover:bg-black transition-colors">${label}</button>`
+    }).join('\n        ')
+
+    const isFirst = i === 0
+    return `
+  <div id="screen-${i}" class="screen absolute inset-0 flex flex-col" style="display:${isFirst ? 'flex' : 'none'}">
+    <div class="flex items-center gap-3 border-b border-gray-100 bg-white px-5 py-4">
+      ${i > 0 ? `<button onclick="showScreen(${i - 1})" class="text-gray-500 hover:text-gray-800 text-sm">← Back</button>` : '<div class="w-6"></div>'}
+      <p class="flex-1 text-center text-sm font-semibold text-[#1D1D1F]">${String(screen.title ?? `Screen ${i + 1}`)}</p>
+      <p class="text-xs text-gray-400">${i + 1}/${typedScreens.length}</p>
+    </div>
+    <div class="flex-1 overflow-y-auto bg-[#F5F5F7] p-5">
+      ${screen.layout ? `<p class="mb-4 text-xs text-gray-500 uppercase tracking-wide">${String(screen.layout)}</p>` : ''}
+      <div class="space-y-3">
+        ${componentHtml}
+      </div>
+      ${screen.notes ? `<p class="mt-4 text-xs text-gray-400 italic">${String(screen.notes)}</p>` : ''}
+    </div>
+  </div>`
+  }).join('')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${personaName} – UI Prototype</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { margin: 0; background: #E5E5EA; display: flex; align-items: center; justify-content: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .phone { width: 390px; height: 844px; background: white; border-radius: 40px; overflow: hidden; position: relative; box-shadow: 0 25px 60px rgba(0,0,0,0.3); }
+    .screen { display: none; }
+  </style>
+</head>
+<body>
+  <div>
+    <p style="text-align:center;margin-bottom:12px;font-size:12px;color:#86868B;font-family:system-ui">
+      ${personaName} · ${String(dir.style ?? '')} · ${typedScreens.length} screens
+    </p>
+    <div class="phone">
+      ${screenDivs}
+    </div>
+  </div>
+  <script>
+    function showScreen(idx) {
+      document.querySelectorAll('.screen').forEach(function(s) { s.style.display = 'none'; });
+      var el = document.getElementById('screen-' + idx);
+      if (el) el.style.display = 'flex';
+    }
+    showScreen(0);
+  </script>
+</body>
+</html>`
 }
 
 function buildFigmaJson(
