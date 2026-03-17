@@ -10,6 +10,7 @@ import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { PersonaDetailClient } from '../../personas/[personaId]/PersonaDetailClient'
 import { FlowCanvasWrapper } from '@/app/components/FlowCanvasWrapper'
 import { MockupPanel } from '@/app/components/MockupPanel'
+import { GenerateMockupButton } from '@/app/components/GenerateMockupButton'
 import { AddInputButton } from '@/app/components/AddInputButton'
 import { SynthesizeFlowButton } from '@/app/components/SynthesizeFlowButton'
 import { RegeneratePersonaButton } from '@/app/components/RegeneratePersonaButton'
@@ -207,6 +208,13 @@ export default async function FlowDetailPage({
               <GenerateJourneyButton
                 projectId={id}
                 hasStages={!!(p.journey_stages && p.journey_stages.length > 0)}
+              />
+            )}
+            {activeTab === 'mockup' && (
+              <GenerateMockupButton
+                projectId={id}
+                personaId={personaId}
+                currentStatus={pers.mockup_status}
               />
             )}
           </div>
