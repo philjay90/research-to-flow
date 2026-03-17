@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Loader2, Copy, Check, RefreshCw } from 'lucide-react'
 import { rerunMockup, dismissMockupDiff } from '@/app/actions'
 import { LoadingDots } from './LoadingDots'
@@ -38,6 +38,16 @@ export function MockupPanel({
   const [elapsed, setElapsed] = useState(0)
   const startedAt = useState(() => Date.now())[0]
 
+  // Trigger the long-lived API route whenever we see 'pending'
+  // (the server action only sets the DB status; the actual agent runs here)
+  const agentTriggeredRef = useRef(false)
+  useEffect(() => {
+    if (status !== 'pending' || agentTriggeredRef.current) return
+    agentTriggeredRef.current = true
+    fetch(`/api/projects/${projectId}/flows/${personaId}/mockup`, { method: 'POST' })
+      .catch(console.error)
+  }, [status, projectId, personaId])
+
   // Poll for status while pending/running
   const poll = useCallback(async () => {
     const res = await fetch(
@@ -72,6 +82,7 @@ export function MockupPanel({
   }, [status, prevStatus])
 
   async function handleRerun() {
+    agentTriggeredRef.current = false  // Reset so the trigger effect fires again
     setIsActing(true)
     await rerunMockup(projectId, personaId)
     setStatus('pending')

@@ -858,14 +858,11 @@ ${requirementsSummary}`,
         .update({ mockup_pending_diff: true, mockup_canvas_hash: newHash })
         .eq('id', personaId)
     } else {
-      // First run or re-run: fire design agent
+      // First run or re-run: mark pending — MockupPanel calls the API route to actually run
       await supabase
         .from('persona')
         .update({ mockup_status: 'pending', mockup_pending_diff: false })
         .eq('id', personaId)
-      import('@/lib/agents/ux-design-agent').then(({ runUxDesignAgent }) =>
-        runUxDesignAgent({ projectId, personaId: personaId as string })
-      ).catch(console.error)
     }
   }
 
@@ -1638,14 +1635,11 @@ export async function rerunMockup(
 ): Promise<{ error?: string }> {
   const { supabase } = await getClientAndUser()
 
+  // Only set DB status — the client MockupPanel calls the API route to actually run the agent
   await supabase
     .from('persona')
     .update({ mockup_status: 'pending', mockup_pending_diff: false })
     .eq('id', personaId)
-
-  import('@/lib/agents/ux-design-agent')
-    .then(({ runUxDesignAgent }) => runUxDesignAgent({ projectId, personaId }))
-    .catch(console.error)
 
   revalidatePath(`/projects/${projectId}/flows/${personaId}`)
   return {}
