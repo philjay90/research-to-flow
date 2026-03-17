@@ -502,7 +502,7 @@ export async function generateFlow(projectId: string, personaId?: string | null)
   // If a persona is selected, fetch only requirements linked to that persona
   let requirementsQuery = supabase
     .from('requirement')
-    .select('business_opportunity, user_story, acceptance_criteria, dfv_tag, journey_stage')
+    .select('id, business_opportunity, user_story, acceptance_criteria, dfv_tag, journey_stage')
     .eq('project_id', projectId)
 
   if (personaId) {
@@ -545,8 +545,8 @@ Design the flow specifically for this persona.\n`
   }
 
   const requirementsSummary = requirements
-    .map((r: { business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null; journey_stage: string | null }, i: number) =>
-      `Requirement ${i + 1}:
+    .map((r: { id: string; business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null; journey_stage: string | null }, i: number) =>
+      `Requirement ${i + 1} (id: "${r.id}"):
   Journey stage: ${r.journey_stage ?? 'unassigned'}
   Business opportunity: ${r.business_opportunity}
   User story: ${r.user_story}
@@ -571,8 +571,8 @@ Valid stage values: ${journeyStages.map((s) => `"${s}"`).join(', ')}
 Return ONLY a JSON object with this exact shape. No explanation, no markdown, no code fences:
 {
   "nodes": [
-    { "id": "n1", "type": "step",     "label": "...", "stage": "${journeyStages[0]}" },
-    { "id": "n2", "type": "decision", "label": "...?", "stage": "${journeyStages[0]}" }
+    { "id": "n1", "type": "step",     "label": "...", "stage": "${journeyStages[0]}", "requirement_id": "<uuid from requirements list or null>" },
+    { "id": "n2", "type": "decision", "label": "...?", "stage": "${journeyStages[0]}", "requirement_id": null }
   ],
   "edges": [
     { "source": "n1", "target": "n2", "label": null },
@@ -583,8 +583,8 @@ Return ONLY a JSON object with this exact shape. No explanation, no markdown, no
 Return ONLY a JSON object with this exact shape. No explanation, no markdown, no code fences:
 {
   "nodes": [
-    { "id": "n1", "type": "step",     "label": "..." },
-    { "id": "n2", "type": "decision", "label": "...?" }
+    { "id": "n1", "type": "step",     "label": "...", "requirement_id": "<uuid from requirements list or null>" },
+    { "id": "n2", "type": "decision", "label": "...?", "requirement_id": null }
   ],
   "edges": [
     { "source": "n1", "target": "n2", "label": null },
@@ -612,6 +612,7 @@ Rules:
 - Keep node labels concise — under 10 words each
 - Decision node labels must be questions ending in "?"
 - The first node should be the entry point, the last should be the end state
+- Each node MUST include a "requirement_id" field: set it to the UUID of the most relevant requirement from the list above (use the exact id string). If a node doesn't map directly to any single requirement, set it to null
 ${stagePromptSection}
 
 Edge label rules:
@@ -627,7 +628,7 @@ ${requirementsSummary}`,
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   let flowData: {
-    nodes: Array<{ id: string; type: string; label: string; stage?: string | null }>
+    nodes: Array<{ id: string; type: string; label: string; stage?: string | null; requirement_id?: string | null }>
     edges: Array<{ source: string; target: string; label?: string | null }>
   }
 
@@ -668,17 +669,23 @@ ${requirementsSummary}`,
     await nodeDelQ.is('persona_id', null)
   }
 
+  // Build a set of valid requirement IDs to guard against Claude hallucinating UUIDs
+  const validReqIds = new Set((requirements ?? []).map((r: { id: string }) => r.id))
+
   // Insert flow nodes
   const nodeIdMap = new Map<string, string>()
   for (const node of flowData.nodes) {
     const pos = positions.get(node.id) ?? { x: 0, y: 0 }
+    const reqId = node.requirement_id && validReqIds.has(node.requirement_id)
+      ? node.requirement_id
+      : null
     const { data, error } = await supabase
       .from('flow_node')
       .insert({
         project_id: projectId,
         flow_id: null,
         persona_id: personaId ?? null,
-        requirement_id: null,
+        requirement_id: reqId,
         type: node.type,
         label: node.label,
         position_x: pos.x,
