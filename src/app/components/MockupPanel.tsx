@@ -45,7 +45,11 @@ export function MockupPanel({
     if (status !== 'pending' || agentTriggeredRef.current) return
     agentTriggeredRef.current = true
     fetch(`/api/projects/${projectId}/flows/${personaId}/mockup`, { method: 'POST' })
-      .catch(console.error)
+      .then((res) => {
+        // If the server returned an error (e.g. 504 timeout), treat as failed immediately
+        if (!res.ok) setStatus('failed')
+      })
+      .catch(() => setStatus('failed'))
   }, [status, projectId, personaId])
 
   // Poll for status while pending/running
@@ -122,8 +126,8 @@ export function MockupPanel({
     const secs = elapsed % 60
     const elapsedStr = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`
 
-    const STEPS = ['Analysing design direction', 'Generating screen specs']
-    const estimatedStep = Math.min(Math.floor(elapsed / 25), 1)
+    const STEPS = ['Generating design + screens']
+    const estimatedStep = 0
 
     // If still running after 90s, the server process was likely killed — offer retry
     const isStuck = elapsed > 90

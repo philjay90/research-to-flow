@@ -37,47 +37,36 @@ export async function runUxDesignAgent({
   const personaSummary = buildPersonaSummary(typedPersona)
 
   try {
-    // Step 1: Visual Direction (25s hard timeout)
-    const directionRes = await anthropic.messages.create({
+    // Single combined call — visual direction + screen specs in one round trip
+    // Using max_tokens: 1000 keeps response time under 10s even on Haiku
+    const res = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 1000,
       system: DESIGN_SYSTEMS_KB,
       messages: [
         {
           role: 'user',
-          content: `Given this persona and user flow, define a visual design direction. Return raw JSON only — no markdown, no preamble.
+          content: `Design a UX mockup for this user flow. Return raw JSON only — no markdown, no preamble.
 
 Persona: ${personaSummary}
 
-Canvas flow:
+Flow steps:
 ${canvasSummary}
 
-Return JSON: { "style": string, "color_emphasis": string, "layout_approach": string, "key_ui_patterns": [string], "tone": string }`,
+Return exactly this shape:
+{
+  "direction": { "style": string, "color_emphasis": string, "layout_approach": string, "key_ui_patterns": [string], "tone": string },
+  "screens": [{ "screen_id": string, "title": string, "layout": string, "components": [{ "type": string, "label": string, "action": string }], "notes": string }]
+}
+
+Limit to the 5 most important screens. Max 3 components per screen.`,
         },
       ],
-    }, { timeout: 25000 })
-    const visualDirection = parseJson(directionRes)
+    }, { timeout: 20000 })
 
-    // Step 2: Screen Specs (40s hard timeout)
-    const screensRes = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-20241022',
-      max_tokens: 2000,
-      system: DESIGN_SYSTEMS_KB,
-      messages: [
-        {
-          role: 'user',
-          content: `Generate UI screen specifications for each meaningful step in this user flow. Return raw JSON array only — no markdown, no preamble.
-
-Canvas flow:
-${canvasSummary}
-
-Visual direction: ${JSON.stringify(visualDirection)}
-
-Return JSON array: [{ "screen_id": string, "title": string, "layout": string, "components": [{ "type": string, "label": string, "action": string }], "notes": string }]`,
-        },
-      ],
-    }, { timeout: 40000 })
-    const screens = parseJson(screensRes)
+    const parsed = parseJson(res)
+    const visualDirection = parsed.direction ?? {}
+    const screens = Array.isArray(parsed.screens) ? parsed.screens : []
 
     // Step 3: HTML Prototype (deterministic — built from screen specs, no LLM call)
     const prototypeHtml = buildPrototypeHtml(screens, visualDirection, typedPersona.name)
