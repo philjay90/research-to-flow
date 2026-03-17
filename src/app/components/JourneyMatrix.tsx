@@ -692,12 +692,17 @@ export function JourneyMatrix({
       unlinkPersonaRequirement(sourcePersonaId, reqId, projectId).then(() => router.refresh())
     }
 
-    // Drop-in bounce animation (fires regardless of which change happened)
+    // Drop-in bounce animation.
+    // For stage changes the DragOverlay flies over the card for ~500ms, so we
+    // delay until just before it disappears (480ms). For persona-only drops the
+    // card appears immediately in a different row (the overlay doesn't cover it),
+    // so trigger the bounce on the very next tick instead.
     if (dropClearRef.current) clearTimeout(dropClearRef.current)
+    const bounceDelay = stageChanged ? 480 : 0
     setTimeout(() => {
       setDroppedReqId(reqId)
       dropClearRef.current = setTimeout(() => setDroppedReqId(null), 600)
-    }, 480)
+    }, bounceDelay)
   }
 
   function handleUndo() {
