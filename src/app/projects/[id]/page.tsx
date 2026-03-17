@@ -6,7 +6,7 @@ import {
   deleteResearchInput,
   deleteAllInputs,
 } from '@/app/actions'
-import type { Project, ResearchInput, Requirement, Persona } from '@/types'
+import type { Project, ResearchInput, Requirement, Persona, FlowNode, FlowEdge } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -19,6 +19,7 @@ import { SynthesizePersonasButton } from '@/app/components/SynthesizePersonasBut
 import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { GenerateJourneyButton } from '@/app/components/GenerateJourneyButton'
+import FlowCanvas from '@/app/components/FlowCanvas'
 
 const INPUT_TYPE_LABELS: Record<string, string> = {
   interview_notes: 'Notes',
@@ -33,10 +34,10 @@ export default async function ProjectPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; persona?: string }>
 }) {
   const { id } = await params
-  const { tab = 'inputs' } = await searchParams
+  const { tab = 'inputs', persona: initialPersonaId } = await searchParams
   const supabase = await createClient()
 
   const { data: project, error: projectError } = await supabase
@@ -52,6 +53,8 @@ export default async function ProjectPage({
     { data: requirements },
     { data: personas },
     { data: personaReqLinks },
+    { data: flowNodes },
+    { data: flowEdges },
   ] = await Promise.all([
     supabase
       .from('research_input')
@@ -71,12 +74,24 @@ export default async function ProjectPage({
     supabase
       .from('persona_requirement')
       .select('persona_id, requirement_id, link_source'),
+    supabase
+      .from('flow_node')
+      .select('*')
+      .eq('project_id', id)
+      .is('flow_id', null),
+    supabase
+      .from('flow_edge')
+      .select('*')
+      .eq('project_id', id)
+      .is('flow_id', null),
   ])
 
   const p = project as Project
   const ins = (inputs ?? []) as ResearchInput[]
   const reqs = (requirements ?? []) as Requirement[]
   const personaList = (personas ?? []) as Persona[]
+  const nodes = (flowNodes ?? []) as FlowNode[]
+  const edges = (flowEdges ?? []) as FlowEdge[]
 
   // Build requirementId → synthesis timestamp map (for isSynthesized / isModified in inputs tab)
   const lastSynthAt = new Map<string, string>()
@@ -87,37 +102,40 @@ export default async function ProjectPage({
     }
   }
 
-  const activeTab = ['inputs', 'journey', 'personas'].includes(tab ?? '') ? tab : 'inputs'
+  const activeTab = ['inputs', 'journey', 'personas', 'canvas'].includes(tab ?? '') ? tab : 'inputs'
 
   const TAB_HELP: Record<string, string> = {
     inputs: 'Add and/or upload any data or insights that helps inform the product.',
     journey: 'A Stage × Persona matrix mapping your user requirements across the contextual journey of how users interact with the product — from before they open the app to after they put it down. Generate a journey to have AI infer the right stages for your project.',
-    personas: 'Synthesized personas based on the inputs provided. Anthropic LLMs will parse through your inputs and develop one or more personas based on those inputs. You can manually edit/add-to/remove them. In the Flow-View, you will be able to generate user-flow based on Persona-specific user requirements and see different flows based on the selected persona.',
+    personas: 'Synthesized personas based on the inputs provided. Anthropic LLMs will parse through your inputs and develop one or more personas based on those inputs. You can manually edit/add-to/remove them.',
+    canvas: 'Interactive flow diagram. Select a persona to see their specific user flow, or view all requirements together. Drag to pan, scroll to zoom, drag between nodes to connect them.',
   }
+
+  // Node count for "all requirements" flow (persona_id = null)
+  const allReqNodeCount = nodes.filter((n) => n.persona_id === null).length
 
   return (
     <>
       <AppHeader
         crumbs={[{ label: p.name }]}
         right={
-          <Button
-            asChild
-            size="sm"
-            className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-5 font-semibold"
-          >
-            <Link href={`/projects/${id}/canvas`}>Flow Canvas</Link>
-          </Button>
+          activeTab === 'canvas' ? (
+            <p className="text-xs text-white/50">
+              Drag to connect nodes · Delete key removes edges
+            </p>
+          ) : undefined
         }
       />
 
-      <main className="px-8 py-12">
+      <main className={`px-8 ${activeTab === 'canvas' ? 'pt-8 pb-0' : 'py-12'}`}>
         {/* Tab switcher */}
-        <div className="mb-8 flex items-end justify-between border-b border-[#E5E5EA]">
+        <div className={`flex items-end justify-between border-b border-[#E5E5EA] ${activeTab === 'canvas' ? 'mb-4' : 'mb-8'}`}>
           <div className="flex items-end">
             {[
-              { key: 'inputs', label: 'Inputs', count: ins.length },
-              { key: 'journey', label: 'User Journeys', count: reqs.length },
-              { key: 'personas', label: 'Personas', count: personaList.length },
+              { key: 'inputs',   label: 'Inputs',       count: ins.length },
+              { key: 'journey',  label: 'User Journeys', count: reqs.length },
+              { key: 'personas', label: 'Personas',      count: personaList.length },
+              { key: 'canvas',   label: 'Canvas',        count: allReqNodeCount },
             ].map(({ key, label, count }) => (
               <Link
                 key={key}
@@ -308,6 +326,27 @@ export default async function ProjectPage({
               />
             )}
           </>
+        )}
+
+        {/* ── CANVAS TAB ── */}
+        {activeTab === 'canvas' && (
+          <div
+            className="rounded-2xl overflow-hidden border border-[#E5E5EA]"
+            style={{ height: 'calc(100vh - 185px)' }}
+          >
+            <FlowCanvas
+              projectId={id}
+              initialPersonaId={initialPersonaId ?? ''}
+              initialNodes={nodes}
+              initialEdges={edges}
+              requirements={reqs}
+              personas={personaList.map((persona) => ({
+                id: persona.id,
+                name: persona.name,
+                updated_at: persona.updated_at,
+              }))}
+            />
+          </div>
         )}
       </main>
     </>
