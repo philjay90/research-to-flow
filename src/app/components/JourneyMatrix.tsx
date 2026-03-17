@@ -334,20 +334,16 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
 
 function RequirementMiniCard({
   requirement,
-  stages,
   personas,
   initialLinkedPersonaIds,
   projectId,
   onOpenModal,
-  onStageChange,
 }: {
   requirement: Requirement
-  stages: string[]
   personas: Persona[]
   initialLinkedPersonaIds: Set<string>
   projectId: string
   onOpenModal: () => void
-  onStageChange: (reqId: string, stage: string | null) => void
 }) {
   const router = useRouter()
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -458,16 +454,6 @@ function RequirementMiniCard({
           </div>
         )}
 
-        <select
-          value={requirement.journey_stage ?? ''}
-          onChange={(e) => onStageChange(requirement.id, e.target.value || null)}
-          className="ml-auto text-[10px] text-[#86868B] bg-transparent border-none cursor-pointer focus:outline-none hover:text-[#1D1D1F] transition-colors"
-        >
-          <option value="">Unassigned</option>
-          {stages.map((s) => (
-            <option key={s} value={s}>{s}</option>
-          ))}
-        </select>
       </div>
     </div>
   )
@@ -678,12 +664,10 @@ export function JourneyMatrix({
                               <RequirementMiniCard
                                 key={req.id}
                                 requirement={req}
-                                stages={stages}
                                 personas={personas}
                                 initialLinkedPersonaIds={reqPersonaIds.get(req.id) ?? new Set()}
                                 projectId={projectId}
                                 onOpenModal={() => setModalReqId(req.id)}
-                                onStageChange={handleStageChange}
                               />
                             ))}
                           </DroppableCell>
