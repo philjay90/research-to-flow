@@ -1079,3 +1079,38 @@ export async function updateRequirementStage(
     .eq('id', requirementId)
   revalidatePath(`/projects/${projectId}`)
 }
+
+export async function renameStage(
+  projectId: string,
+  oldName: string,
+  newName: string
+) {
+  const { supabase } = await getClientAndUser()
+
+  // Update the stage name in the project's journey_stages array
+  const { data: project } = await supabase
+    .from('project')
+    .select('journey_stages')
+    .eq('id', projectId)
+    .single()
+
+  if (!project?.journey_stages) return
+
+  const updatedStages = (project.journey_stages as string[]).map((s) =>
+    s === oldName ? newName : s
+  )
+
+  await supabase
+    .from('project')
+    .update({ journey_stages: updatedStages })
+    .eq('id', projectId)
+
+  // Rename the stage on all requirements that had the old name
+  await supabase
+    .from('requirement')
+    .update({ journey_stage: newName })
+    .eq('project_id', projectId)
+    .eq('journey_stage', oldName)
+
+  revalidatePath(`/projects/${projectId}`)
+}

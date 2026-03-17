@@ -19,6 +19,7 @@ import {
   updateRequirement,
   linkPersonaRequirement,
   unlinkPersonaRequirement,
+  renameStage,
 } from '@/app/actions'
 import { GenerateJourneyButton } from './GenerateJourneyButton'
 
@@ -481,6 +482,66 @@ function DragCard({ requirement }: { requirement: Requirement }) {
 }
 
 // ---------------------------------------------------------------------------
+// Editable column header (click to rename a stage)
+// ---------------------------------------------------------------------------
+
+function EditableColumnHeader({
+  name,
+  onRename,
+}: {
+  name: string
+  onRename: (newName: string) => void
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { setDraft(name) }, [name])
+
+  function startEdit() {
+    setDraft(name)
+    setIsEditing(true)
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  function commit() {
+    const trimmed = draft.trim()
+    if (trimmed && trimmed !== name) onRename(trimmed)
+    setIsEditing(false)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter') { e.preventDefault(); commit() }
+    if (e.key === 'Escape') { setDraft(name); setIsEditing(false) }
+  }
+
+  if (isEditing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={handleKeyDown}
+        className="w-full bg-transparent text-xs font-semibold uppercase tracking-wide text-[#1D1D1F] focus:outline-none border-b border-[#86868B] pb-0.5"
+        autoFocus
+      />
+    )
+  }
+
+  return (
+    <button
+      onClick={startEdit}
+      className="group flex items-center gap-1 text-left text-xs font-semibold text-[#86868B] uppercase tracking-wide hover:text-[#1D1D1F] transition-colors"
+      title="Click to rename"
+    >
+      <span>{name}</span>
+      <span className="opacity-0 group-hover:opacity-50 text-[10px] transition-opacity">✎</span>
+    </button>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // JourneyMatrix
 // ---------------------------------------------------------------------------
 
@@ -508,12 +569,14 @@ export function JourneyMatrix({
 }: JourneyMatrixProps) {
   const router = useRouter()
   const [localReqs, setLocalReqs] = useState(requirements)
+  const [localStages, setLocalStages] = useState(stages ?? [])
   const [activeReqId, setActiveReqId] = useState<string | null>(null)
   const [modalReqId, setModalReqId] = useState<string | null>(null)
   const [lastMove, setLastMove] = useState<LastMove | null>(null)
   const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => { setLocalReqs(requirements) }, [requirements])
+  useEffect(() => { setLocalStages(stages ?? []) }, [stages])
   useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }, [])
 
   const reqPersonaIds = useMemo(() => {
@@ -585,6 +648,21 @@ export function JourneyMatrix({
     router.refresh()
   }
 
+  async function handleRenameStage(oldName: string, newName: string) {
+    // Optimistically update stage list and any requirements assigned to old name
+    setLocalStages((prev) => prev.map((s) => (s === oldName ? newName : s)))
+    setLocalReqs((prev) =>
+      prev.map((r) => (r.journey_stage === oldName ? { ...r, journey_stage: newName } : r))
+    )
+    // Clear undo toast if it references the old stage name
+    if (lastMove?.toStage === oldName || lastMove?.fromStage === oldName) {
+      setLastMove(null)
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+    }
+    await renameStage(projectId, oldName, newName)
+    router.refresh()
+  }
+
   if (!stages || stages.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -596,7 +674,20 @@ export function JourneyMatrix({
     )
   }
 
-  const allColumns = [...stages, 'Unassigned']
+  // Build visible columns: only stages with ≥1 req, minimum 2; Unassigned only if needed
+  const stagesWithReqsSet = new Set(
+    localReqs.filter((r) => r.journey_stage).map((r) => r.journey_stage as string)
+  )
+  let visibleStages = localStages.filter((s) => stagesWithReqsSet.has(s))
+  if (visibleStages.length < 2) {
+    const shown = new Set(visibleStages)
+    for (const s of localStages) {
+      if (!shown.has(s)) { visibleStages = [...visibleStages, s]; shown.add(s) }
+      if (visibleStages.length >= 2) break
+    }
+  }
+  const hasUnassigned = localReqs.some((r) => !r.journey_stage)
+  const allColumns = hasUnassigned ? [...visibleStages, 'Unassigned'] : visibleStages
 
   function getReqs(personaId: string | null, stage: string): Requirement[] {
     return localReqs.filter((r) => {
@@ -621,7 +712,7 @@ export function JourneyMatrix({
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="space-y-3">
         <p className="text-xs text-[#86868B]">
-          {stages.length} stages · {localReqs.length} requirements · {personas.length} personas
+          {localStages.length} stages · {localReqs.length} requirements · {personas.length} personas
         </p>
 
         <div className="overflow-x-auto rounded-2xl border border-[#E5E5EA]">
@@ -634,9 +725,18 @@ export function JourneyMatrix({
                 {allColumns.map((col) => (
                   <th
                     key={col}
-                    className="min-w-[220px] w-[220px] px-4 py-3 text-left text-xs font-semibold text-[#86868B] uppercase tracking-wide border-b border-r border-[#E5E5EA] last:border-r-0"
+                    className="min-w-[220px] w-[220px] px-4 py-3 text-left border-b border-r border-[#E5E5EA] last:border-r-0"
                   >
-                    {col}
+                    {col === 'Unassigned' ? (
+                      <span className="text-xs font-semibold text-[#86868B] uppercase tracking-wide">
+                        Unassigned
+                      </span>
+                    ) : (
+                      <EditableColumnHeader
+                        name={col}
+                        onRename={(newName) => handleRenameStage(col, newName)}
+                      />
+                    )}
                   </th>
                 ))}
               </tr>
