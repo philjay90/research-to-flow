@@ -33,6 +33,12 @@ const DECISION_COLOR = '#C97D60'
 // Threshold: if target is this many px above source, treat as a back-edge
 const BACK_EDGE_THRESHOLD = 30
 
+// Threshold: if target is this many px to the right of source, treat as a cross-column forward edge
+const CROSS_FORWARD_THRESHOLD = 180
+
+// Lane header width (must match COLUMN_W in actions/index.ts)
+const LANE_HEADER_W = 300
+
 // Decision node visual dimensions (must stay in sync with NODE_H_DECISION in actions/index.ts)
 const DEC_W = 200
 const DEC_H = 120
@@ -53,48 +59,66 @@ interface Props {
 }
 
 function toRFNodes(nodes: FlowNode[]): Node[] {
-  return nodes.map((n) => ({
-    id: n.id,
-    position: { x: n.position_x, y: n.position_y },
-    data: { label: n.label },
-    type: n.type === 'decision' ? 'decisionNode' : 'stepNode',
-  }))
+  return nodes.map((n) => {
+    if (n.type === 'laneHeader') {
+      return {
+        id: n.id,
+        position: { x: n.position_x, y: n.position_y },
+        data: { label: n.label },
+        type: 'laneHeaderNode',
+        draggable: false,
+        selectable: false,
+        focusable: false,
+      }
+    }
+    return {
+      id: n.id,
+      position: { x: n.position_x, y: n.position_y },
+      data: { label: n.label },
+      type: n.type === 'decision' ? 'decisionNode' : 'stepNode',
+    }
+  })
 }
 
 /**
  * Convert DB edges to React Flow edges.
- * Back-edges (target sits above source) are routed through the left/right
- * handles. All edges use getSmoothStepPath for smooth curves.
- * Labels are positioned on the vertical descent via EdgeLabelRenderer.
+ * Back-edges (target sits above source) are routed through left/right handles.
+ * Cross-column forward edges (target is far to the right) also use right/left handles.
+ * Lane header nodes are excluded from all edge connections.
  */
 function toRFEdges(edges: FlowEdge[], nodes: FlowNode[]): Edge[] {
-  const posMap = new Map(nodes.map((n) => [n.id, n.position_y]))
+  const posMap = new Map(nodes.map((n) => [n.id, { x: n.position_x, y: n.position_y }]))
   const typeMap = new Map(nodes.map((n) => [n.id, n.type]))
+  const laneHeaderIds = new Set(nodes.filter((n) => n.type === 'laneHeader').map((n) => n.id))
 
-  return edges.map((e) => {
-    const sourceY = posMap.get(e.source_node_id) ?? 0
-    const targetY = posMap.get(e.target_node_id) ?? 0
-    const sourceType = typeMap.get(e.source_node_id)
+  return edges
+    .filter((e) => !laneHeaderIds.has(e.source_node_id) && !laneHeaderIds.has(e.target_node_id))
+    .map((e) => {
+      const sourcePos = posMap.get(e.source_node_id) ?? { x: 0, y: 0 }
+      const targetPos = posMap.get(e.target_node_id) ?? { x: 0, y: 0 }
+      const sourceType = typeMap.get(e.source_node_id)
 
-    const isBackEdge = targetY < sourceY - BACK_EDGE_THRESHOLD
-    const sourceHandle = isBackEdge
-      ? sourceType === 'decision' ? 'right' : 'right-out'
-      : undefined
-    const targetHandle = isBackEdge ? 'left-in' : undefined
+      const isBackEdge = targetPos.y < sourcePos.y - BACK_EDGE_THRESHOLD
+      const isCrossForward = !isBackEdge && targetPos.x - sourcePos.x > CROSS_FORWARD_THRESHOLD
 
-    return {
-      id: e.id,
-      source: e.source_node_id,
-      target: e.target_node_id,
-      sourceHandle,
-      targetHandle,
-      type: 'labelledEdge',
-      label: e.label ?? undefined,
-      data: { isBackEdge },
-      markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR, width: 22, height: 22 },
-      style: { stroke: EDGE_COLOR, strokeWidth: 2.5 },
-    }
-  })
+      const sourceHandle = isBackEdge || isCrossForward
+        ? sourceType === 'decision' ? 'right' : 'right-out'
+        : undefined
+      const targetHandle = isBackEdge || isCrossForward ? 'left-in' : undefined
+
+      return {
+        id: e.id,
+        source: e.source_node_id,
+        target: e.target_node_id,
+        sourceHandle,
+        targetHandle,
+        type: 'labelledEdge',
+        label: e.label ?? undefined,
+        data: { isBackEdge, isCrossForward },
+        markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR, width: 22, height: 22 },
+        style: { stroke: EDGE_COLOR, strokeWidth: 2.5 },
+      }
+    })
 }
 
 // ── Custom edge ───────────────────────────────────────────────────────────────
@@ -110,6 +134,7 @@ function LabelledEdge({
   data,
 }: EdgeProps) {
   const isBackEdge = !!(data as Record<string, unknown>)?.isBackEdge
+  const isCrossForward = !!(data as Record<string, unknown>)?.isCrossForward
 
   const [edgePath] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition,
@@ -117,7 +142,13 @@ function LabelledEdge({
     borderRadius: 8,
   })
 
-  const labelTransform = isBackEdge
+  // Label positioning:
+  // - cross-forward: centered horizontally between source and target, above
+  // - back-edge: near source exit point
+  // - normal: above the target arrival point
+  const labelTransform = isCrossForward
+    ? `translate(-50%, -100%) translate(${(sourceX + targetX) / 2}px, ${Math.min(sourceY, targetY) - 8}px)`
+    : isBackEdge
     ? `translate(0%, -50%) translate(${sourceX + 16}px, ${sourceY}px)`
     : `translate(-50%, -100%) translate(${targetX}px, ${targetY - 36}px)`
 
@@ -214,7 +245,35 @@ function DecisionNode({ data }: { data: Record<string, unknown> }) {
   )
 }
 
-const nodeTypes = { stepNode: StepNode, decisionNode: DecisionNode }
+function LaneHeaderNode({ data }: { data: Record<string, unknown> }) {
+  return (
+    <div
+      style={{
+        width: LANE_HEADER_W,
+        background: '#1D1D1F',
+        borderRadius: 10,
+        padding: '8px 16px',
+        pointerEvents: 'none',
+      }}
+    >
+      <p
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          letterSpacing: '0.08em',
+          textTransform: 'uppercase',
+          color: '#ffffff',
+          textAlign: 'center',
+          margin: 0,
+        }}
+      >
+        {data.label as string}
+      </p>
+    </div>
+  )
+}
+
+const nodeTypes = { stepNode: StepNode, decisionNode: DecisionNode, laneHeaderNode: LaneHeaderNode }
 const edgeTypes = { labelledEdge: LabelledEdge }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -232,9 +291,12 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>(initialPersonaId)
 
   // Derive the subset of nodes/edges for the current persona selection.
+  // Lane header nodes (type === 'laneHeader') are always included — they are project-level
+  // and should appear as column headers regardless of which persona is selected.
   const filteredNodes = useMemo(() => {
     return initialNodes.filter((n) =>
-      selectedPersonaId ? n.persona_id === selectedPersonaId : n.persona_id === null
+      n.type === 'laneHeader' ||
+      (selectedPersonaId ? n.persona_id === selectedPersonaId : n.persona_id === null)
     )
   }, [initialNodes, selectedPersonaId])
 
@@ -262,19 +324,17 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
 
   /**
    * Determine whether the generate button should be active.
+   * Lane header nodes are excluded from the "has flow" check — only step/decision
+   * nodes that represent actual requirements count.
    *
-   * hasFlow   — there are nodes for the current persona selection
+   * hasFlow   — there are non-header nodes for the current persona selection
    * upToDate  — no requirement or persona has been updated after the last generation
-   *
-   * States:
-   *   !hasFlow                  → "✦ Generate Flow"   (enabled)
-   *   hasFlow && !upToDate      → "↺ Re-generate"     (enabled)
-   *   hasFlow && upToDate       → "✓ Up to date"      (disabled)
    */
-  const hasFlow = filteredNodes.length > 0
+  const flowNodes = filteredNodes.filter((n) => n.type !== 'laneHeader')
+  const hasFlow = flowNodes.length > 0
 
   const latestGeneratedAt = hasFlow
-    ? maxDate(filteredNodes.map((n) => n.created_at))
+    ? maxDate(flowNodes.map((n) => n.created_at))
     : null
 
   const latestDataChangedAt = maxDate([
@@ -304,6 +364,8 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
   // ── Event handlers ───────────────────────────────────────────────────────
 
   const onNodeDragStop = useCallback((_event: React.MouseEvent, node: Node) => {
+    // Lane header nodes are not user-draggable — skip position save
+    if (node.type === 'laneHeaderNode') return
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(() => {
       saveNodePosition(node.id, node.position.x, node.position.y)
@@ -321,7 +383,7 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
             ...connection,
             id: dbId,
             type: 'labelledEdge',
-            data: { isBackEdge: false },
+            data: { isBackEdge: false, isCrossForward: false },
             markerEnd: { type: MarkerType.ArrowClosed, color: EDGE_COLOR, width: 22, height: 22 },
             style: { stroke: EDGE_COLOR, strokeWidth: 2.5 },
           },

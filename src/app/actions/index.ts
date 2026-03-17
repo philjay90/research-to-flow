@@ -11,6 +11,13 @@ const NODE_W = 220
 const NODE_H_STEP = 70
 const NODE_H_DECISION = 120
 
+// ── Journey swim-lane layout constants ────────────────────────────────────────
+// These must stay in sync with LANE_HEADER_W / CROSS_FORWARD_THRESHOLD in FlowCanvas.tsx
+const COLUMN_W = 300        // column content width (px)
+const COLUMN_GAP = 60       // horizontal gap between columns
+const COLUMN_TOTAL = COLUMN_W + COLUMN_GAP
+const CONTENT_START_Y = 120 // Y where flow nodes begin (below the lane header)
+
 // ---------------------------------------------------------------------------
 // Auth helper
 // ---------------------------------------------------------------------------
@@ -38,6 +45,71 @@ function applyDagreLayout(
     const h = n.type === 'decision' ? NODE_H_DECISION : NODE_H_STEP
     positions.set(n.id, { x: pos.x - NODE_W / 2, y: pos.y - h / 2 })
   })
+  return positions
+}
+
+/**
+ * Stage-aware left-to-right layout.
+ * Each journey stage becomes a column; within a column dagre orders nodes top-to-bottom.
+ */
+function applyJourneyLayout(
+  nodes: Array<{ id: string; type: string; stage: string | null }>,
+  edges: Array<{ source: string; target: string }>,
+  stages: string[]
+): Map<string, { x: number; y: number }> {
+  const positions = new Map<string, { x: number; y: number }>()
+
+  // Group by stage
+  const stageGroups = new Map<string, Array<{ id: string; type: string }>>()
+  const unassigned: Array<{ id: string; type: string }> = []
+
+  for (const node of nodes) {
+    const idx = node.stage ? stages.indexOf(node.stage) : -1
+    if (idx >= 0) {
+      if (!stageGroups.has(stages[idx])) stageGroups.set(stages[idx], [])
+      stageGroups.get(stages[idx])!.push(node)
+    } else {
+      unassigned.push(node)
+    }
+  }
+
+  // Only include stages that have nodes; append unassigned at the end
+  const occupiedStages = stages.filter((s) => stageGroups.has(s))
+  if (unassigned.length > 0) occupiedStages.push('__unassigned__')
+
+  occupiedStages.forEach((stage, colIdx) => {
+    const colNodes = stage === '__unassigned__' ? unassigned : (stageGroups.get(stage) ?? [])
+    const colX = colIdx * COLUMN_TOTAL
+    if (colNodes.length === 0) return
+
+    // Use dagre for within-column ordering
+    const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}))
+    g.setGraph({ rankdir: 'TB', ranksep: 80, nodesep: 40 })
+
+    colNodes.forEach((n) => {
+      g.setNode(n.id, { width: NODE_W, height: n.type === 'decision' ? NODE_H_DECISION : NODE_H_STEP })
+    })
+
+    const colNodeIds = new Set(colNodes.map((n) => n.id))
+    edges.forEach((e) => {
+      if (colNodeIds.has(e.source) && colNodeIds.has(e.target)) {
+        try { g.setEdge(e.source, e.target) } catch { /* skip cycles */ }
+      }
+    })
+
+    Dagre.layout(g)
+
+    colNodes.forEach((n) => {
+      const pos = g.node(n.id)
+      if (!pos) return
+      const h = n.type === 'decision' ? NODE_H_DECISION : NODE_H_STEP
+      positions.set(n.id, {
+        x: colX + (COLUMN_W - NODE_W) / 2,  // centre node in its column
+        y: CONTENT_START_Y + (pos.y - h / 2),
+      })
+    })
+  })
+
   return positions
 }
 
@@ -418,10 +490,19 @@ export async function generateFlow(projectId: string, personaId?: string | null)
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
 
+  // Fetch project's journey stages (if set, we'll use swim-lane layout)
+  const { data: projectData } = await supabase
+    .from('project')
+    .select('journey_stages')
+    .eq('id', projectId)
+    .single()
+  const journeyStages: string[] = (projectData?.journey_stages as string[] | null) ?? []
+  const hasStages = journeyStages.length > 0
+
   // If a persona is selected, fetch only requirements linked to that persona
   let requirementsQuery = supabase
     .from('requirement')
-    .select('business_opportunity, user_story, acceptance_criteria, dfv_tag')
+    .select('business_opportunity, user_story, acceptance_criteria, dfv_tag, journey_stage')
     .eq('project_id', projectId)
 
   if (personaId) {
@@ -464,14 +545,53 @@ Design the flow specifically for this persona.\n`
   }
 
   const requirementsSummary = requirements
-    .map((r: { business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null }, i: number) =>
+    .map((r: { business_opportunity: string; user_story: string; acceptance_criteria: string[]; dfv_tag: string | null; journey_stage: string | null }, i: number) =>
       `Requirement ${i + 1}:
+  Journey stage: ${r.journey_stage ?? 'unassigned'}
   Business opportunity: ${r.business_opportunity}
   User story: ${r.user_story}
   Acceptance criteria: ${r.acceptance_criteria.join(' | ')}
   DFV: ${r.dfv_tag ?? 'unclassified'}`
     )
     .join('\n\n')
+
+  // Build the stage-assignment section of the prompt (only when stages exist)
+  const stagePromptSection = hasStages ? `
+SWIM-LANE LAYOUT:
+This flow is organised as a left-to-right grid with one column per journey stage (in order):
+${journeyStages.map((s, i) => `  ${i + 1}. ${s}`).join('\n')}
+
+Every node MUST include a "stage" field set to one of these stage names EXACTLY (case-sensitive).
+Use the requirements' "Journey stage" field as the primary guide for which stage a node belongs to.
+The overall flow should progress left-to-right across stages. Within each stage, steps flow top-to-bottom.
+Cross-stage edges (e.g. a step in Stage 1 connecting to a step in Stage 2) are expected.
+
+Valid stage values: ${journeyStages.map((s) => `"${s}"`).join(', ')}
+
+Return ONLY a JSON object with this exact shape. No explanation, no markdown, no code fences:
+{
+  "nodes": [
+    { "id": "n1", "type": "step",     "label": "...", "stage": "${journeyStages[0]}" },
+    { "id": "n2", "type": "decision", "label": "...?", "stage": "${journeyStages[0]}" }
+  ],
+  "edges": [
+    { "source": "n1", "target": "n2", "label": null },
+    { "source": "n2", "target": "n3", "label": "Yes" },
+    { "source": "n2", "target": "n4", "label": "No" }
+  ]
+}` : `
+Return ONLY a JSON object with this exact shape. No explanation, no markdown, no code fences:
+{
+  "nodes": [
+    { "id": "n1", "type": "step",     "label": "..." },
+    { "id": "n2", "type": "decision", "label": "...?" }
+  ],
+  "edges": [
+    { "source": "n1", "target": "n2", "label": null },
+    { "source": "n2", "target": "n3", "label": "Yes" },
+    { "source": "n2", "target": "n4", "label": "No" }
+  ]
+}`
 
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-5-20251101',
@@ -492,19 +612,7 @@ Rules:
 - Keep node labels concise — under 10 words each
 - Decision node labels must be questions ending in "?"
 - The first node should be the entry point, the last should be the end state
-
-Return ONLY a JSON object with this exact shape. No explanation, no markdown, no code fences:
-{
-  "nodes": [
-    { "id": "n1", "type": "step", "label": "..." },
-    { "id": "n2", "type": "decision", "label": "...?" }
-  ],
-  "edges": [
-    { "source": "n1", "target": "n2", "label": null },
-    { "source": "n2", "target": "n3", "label": "Yes" },
-    { "source": "n2", "target": "n4", "label": "No" }
-  ]
-}
+${stagePromptSection}
 
 Edge label rules:
 - Edges leaving a "decision" node MUST have a label ("Yes", "No", or a short condition)
@@ -519,7 +627,7 @@ ${requirementsSummary}`,
   const responseText = message.content[0].type === 'text' ? message.content[0].text : ''
 
   let flowData: {
-    nodes: Array<{ id: string; type: string; label: string }>
+    nodes: Array<{ id: string; type: string; label: string; stage?: string | null }>
     edges: Array<{ source: string; target: string; label?: string | null }>
   }
 
@@ -532,9 +640,24 @@ ${requirementsSummary}`,
     return { error: 'Failed to parse flow from Claude' }
   }
 
-  const positions = applyDagreLayout(flowData.nodes, flowData.edges)
+  // Choose layout: journey swim-lanes or fallback linear dagre
+  const positions = hasStages
+    ? applyJourneyLayout(
+        flowData.nodes.map((n) => ({ id: n.id, type: n.type, stage: n.stage ?? null })),
+        flowData.edges,
+        journeyStages
+      )
+    : applyDagreLayout(flowData.nodes, flowData.edges)
 
-  // Delete only the flow belonging to this persona selection
+  // Delete old lane headers (always rebuilt from current journey stages)
+  await supabase
+    .from('flow_node')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('type', 'laneHeader')
+    .is('flow_id', null)
+
+  // Delete the flow nodes/edges for this persona selection
   const edgeDelQ = supabase.from('flow_edge').delete().eq('project_id', projectId).is('flow_id', null)
   const nodeDelQ = supabase.from('flow_node').delete().eq('project_id', projectId).is('flow_id', null)
   if (personaId) {
@@ -545,8 +668,8 @@ ${requirementsSummary}`,
     await nodeDelQ.is('persona_id', null)
   }
 
+  // Insert flow nodes
   const nodeIdMap = new Map<string, string>()
-
   for (const node of flowData.nodes) {
     const pos = positions.get(node.id) ?? { x: 0, y: 0 }
     const { data, error } = await supabase
@@ -564,12 +687,10 @@ ${requirementsSummary}`,
       })
       .select('id')
       .single()
-
-    if (!error && data) {
-      nodeIdMap.set(node.id, data.id)
-    }
+    if (!error && data) nodeIdMap.set(node.id, data.id)
   }
 
+  // Insert edges
   const edgeRows = flowData.edges
     .map((e) => {
       const sourceId = nodeIdMap.get(e.source)
@@ -589,6 +710,26 @@ ${requirementsSummary}`,
 
   if (edgeRows.length > 0) {
     await supabase.from('flow_edge').insert(edgeRows)
+  }
+
+  // Create lane header nodes for each stage that received at least one node
+  if (hasStages) {
+    const assignedStages = new Set(flowData.nodes.map((n) => n.stage).filter(Boolean))
+    for (let i = 0; i < journeyStages.length; i++) {
+      const stage = journeyStages[i]
+      if (!assignedStages.has(stage)) continue
+      await supabase.from('flow_node').insert({
+        project_id: projectId,
+        flow_id: null,
+        persona_id: null,   // Lane headers are project-level (shown for all persona views)
+        requirement_id: null,
+        type: 'laneHeader',
+        label: stage,
+        position_x: i * COLUMN_TOTAL,
+        position_y: 0,
+        user_id: user.id,
+      })
+    }
   }
 
   return { success: true }
