@@ -320,7 +320,7 @@ function DroppableCell({ id, children }: { id: string; children: React.ReactNode
   return (
     <div
       ref={setNodeRef}
-      className={`min-h-[110px] w-full space-y-2 p-3 transition-colors duration-150 ${
+      className={`h-full min-h-[110px] w-full space-y-2 p-3 transition-colors duration-150 ${
         isOver ? 'bg-[#DBEAFE] ring-2 ring-inset ring-[#3B82F6]' : ''
       }`}
     >
@@ -628,10 +628,12 @@ export function JourneyMatrix({
     // Optimistic update
     setLocalReqs((prev) => prev.map((r) => (r.id === reqId ? { ...r, journey_stage: newStage } : r)))
 
-    // Trigger drop-in animation on the landed card
-    setDroppedReqId(reqId)
+    // Trigger drop-in bounce after the overlay fly animation (500ms) completes
     if (dropClearRef.current) clearTimeout(dropClearRef.current)
-    dropClearRef.current = setTimeout(() => setDroppedReqId(null), 600)
+    setTimeout(() => {
+      setDroppedReqId(reqId)
+      dropClearRef.current = setTimeout(() => setDroppedReqId(null), 600)
+    }, 480)
 
     // Record move for undo
     setLastMove({
@@ -758,7 +760,7 @@ export function JourneyMatrix({
             if (topScrollRef.current) topScrollRef.current.scrollLeft = e.currentTarget.scrollLeft
           }}
         >
-          <table className="min-w-full border-collapse">
+          <table className="min-w-full border-collapse" style={{ height: '1px' }}>
             <thead>
               <tr className="bg-[#F5F5F7]">
                 <th className="sticky left-0 z-10 bg-[#F5F5F7] min-w-[140px] w-[140px] px-4 py-3 text-left text-xs font-semibold text-[#86868B] uppercase tracking-wide border-b border-r border-[#E5E5EA]">
@@ -799,7 +801,7 @@ export function JourneyMatrix({
                       return (
                         <td
                           key={col}
-                          className={`border-b border-r border-[#E5E5EA] last:border-r-0 p-0 align-top ${rowIdx === rows.length - 1 ? 'border-b-0' : ''}`}
+                          className={`border-b border-r border-[#E5E5EA] last:border-r-0 p-0 h-full align-top ${rowIdx === rows.length - 1 ? 'border-b-0' : ''}`}
                         >
                           <DroppableCell id={droppableId}>
                             {cellReqs.map((req) => (
@@ -826,7 +828,7 @@ export function JourneyMatrix({
       </div>
 
       {/* Ghost card at cursor during drag */}
-      <DragOverlay dropAnimation={null}>
+      <DragOverlay dropAnimation={{ duration: 500, easing: 'cubic-bezier(0.25, 1, 0.5, 1)' }}>
         {activeReq ? <DragCard requirement={activeReq} /> : null}
       </DragOverlay>
 
