@@ -50,21 +50,28 @@ export function EditableInputCard({
   const [isClamped, setIsClamped] = useState(false)
   const contentRef = useRef<HTMLTextAreaElement>(null)
   const viewContentRef = useRef<HTMLParagraphElement>(null)
+  const isExpandedRef = useRef(false)
   const router = useRouter()
 
+  // Keep ref in sync so checkClamped can read it without a stale closure
+  useEffect(() => { isExpandedRef.current = isExpanded }, [isExpanded])
+
   // Detect whether the collapsed content is actually being clamped.
-  // With overflow:hidden + -webkit-line-clamp, scrollHeight is always the full
-  // content height while clientHeight is the visible (clamped) height, so a
-  // simple comparison is enough — no need to toggle the clamp.
+  // Skip the check while expanded — the element has no height constraint then,
+  // so scrollHeight === clientHeight which would wrongly clear isClamped and
+  // hide the "Show less" button.
   const checkClamped = useCallback(() => {
+    if (isExpandedRef.current) return
     const el = viewContentRef.current
     if (!el) return
-    setIsClamped(el.scrollHeight > el.clientHeight + 2) // +2 for sub-pixel rounding
+    setIsClamped(el.scrollHeight > el.clientHeight + 2)
   }, [])
 
   useEffect(() => {
+    // Reset when content changes so a newly-shortened edit removes the toggle
+    setIsClamped(false)
+    setIsExpanded(false)
     checkClamped()
-    // Also recheck if the element is resized (e.g. column width changes)
     const el = viewContentRef.current
     if (!el) return
     const ro = new ResizeObserver(checkClamped)
@@ -199,24 +206,30 @@ export function EditableInputCard({
         {INPUT_TYPE_LABELS[type] ?? type}
       </Badge>
 
-      <p
-        ref={viewContentRef}
-        className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
-        style={
-          !isExpanded
-            ? {
-                display: '-webkit-box',
-                WebkitLineClamp: 5,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }
-            : undefined
-        }
+      {/* Scrollable wrapper when expanded (caps at ~20 lines) */}
+      <div
+        style={isExpanded ? { maxHeight: '460px', overflowY: 'auto' } : undefined}
+        className={isExpanded ? 'pr-1' : undefined}
       >
-        {content}
-      </p>
+        <p
+          ref={viewContentRef}
+          className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
+          style={
+            !isExpanded
+              ? {
+                  display: '-webkit-box',
+                  WebkitLineClamp: 5,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                }
+              : undefined
+          }
+        >
+          {content}
+        </p>
+      </div>
 
-      {/* Expand / collapse toggle — only rendered when content actually overflows */}
+      {/* Expand / collapse toggle — only rendered when content actually overflows 5 lines */}
       {isClamped && (
         <button
           onClick={() => setIsExpanded((v) => !v)}
