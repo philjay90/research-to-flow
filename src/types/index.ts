@@ -5,11 +5,39 @@ export type ResearchInputType =
   | 'business_requirements'
   | 'other'
 
+export type ResearchStatus = 'idle' | 'pending' | 'running' | 'complete' | 'failed'
+
+export interface UxResearchArchetype {
+  name: string
+  description: string
+  primary_goals: string[]
+  typical_pain_points: string[]
+}
+
+export interface UxResearchCompetitor {
+  player: string
+  positioning: string
+  notable_ux_patterns: string[]
+}
+
+export interface UxResearchBrief {
+  app_category: string
+  user_archetypes: UxResearchArchetype[]
+  competitive_landscape: UxResearchCompetitor[]
+  journey_stage_conventions: string[]
+  common_pain_points: string[]
+  ux_pattern_notes: string
+  generated_at: string
+}
+
 export interface Project {
   id: string
   name: string
   description: string | null
   journey_stages: string[] | null
+  ux_research_enabled: boolean
+  research_status: ResearchStatus
+  ux_research_brief: UxResearchBrief | null
   created_at: string
   updated_at: string
 }

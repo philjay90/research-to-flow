@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase'
 import { createClient as createAdminClient } from '@supabase/supabase-js'
 import { anthropic } from '@/lib/anthropic'
 import Dagre from '@dagrejs/dagre'
+import { buildResearchContext } from '@/lib/agents/research-context'
 
 const NODE_W = 220
 const NODE_H_STEP = 70
@@ -173,12 +174,19 @@ export async function createProject(formData: FormData) {
 
   const name = formData.get('name') as string
   const description = formData.get('description') as string
+  const uxResearchEnabled = formData.get('ux_research_enabled') === 'true'
 
   if (!name?.trim()) return
 
   const { data, error } = await supabase
     .from('project')
-    .insert({ name: name.trim(), description: description?.trim() || null, user_id: user.id })
+    .insert({
+      name: name.trim(),
+      description: description?.trim() || null,
+      user_id: user.id,
+      ux_research_enabled: uxResearchEnabled,
+      research_status: uxResearchEnabled ? 'pending' : 'idle',
+    })
     .select('id')
     .single()
 
@@ -187,7 +195,41 @@ export async function createProject(formData: FormData) {
     return
   }
 
+  if (uxResearchEnabled) {
+    // Fire and forget — do not await, so the user is not blocked
+    import('@/lib/agents/ux-research-agent')
+      .then(({ runUxResearchAgent }) =>
+        runUxResearchAgent({ projectId: data.id, name: name.trim(), description: description?.trim() || null })
+      )
+      .catch(console.error)
+  }
+
   redirect(`/projects/${data.id}`)
+}
+
+export async function rerunUxResearch(projectId: string): Promise<{ error?: string }> {
+  const { supabase } = await getClientAndUser()
+  const { data: project } = await supabase
+    .from('project')
+    .select('name, description')
+    .eq('id', projectId)
+    .single()
+
+  if (!project) return { error: 'Project not found' }
+
+  await supabase
+    .from('project')
+    .update({ research_status: 'pending', ux_research_brief: null })
+    .eq('id', projectId)
+
+  import('@/lib/agents/ux-research-agent')
+    .then(({ runUxResearchAgent }) =>
+      runUxResearchAgent({ projectId, name: project.name, description: project.description })
+    )
+    .catch(console.error)
+
+  revalidatePath(`/projects/${projectId}`)
+  return {}
 }
 
 export async function deleteProject(projectId: string) {
@@ -503,11 +545,13 @@ export async function generateFlow(projectId: string, personaId?: string | null)
   // Fetch project's journey stages (if set, we'll use swim-lane layout)
   const { data: projectData } = await supabase
     .from('project')
-    .select('journey_stages')
+    .select('journey_stages, ux_research_brief')
     .eq('id', projectId)
     .single()
   const journeyStages: string[] = (projectData?.journey_stages as string[] | null) ?? []
   const hasStages = journeyStages.length > 0
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const researchContext = buildResearchContext((projectData as any)?.ux_research_brief ?? null)
 
   // If a persona is selected, fetch only requirements linked to that persona
   let requirementsQuery = supabase
@@ -606,6 +650,7 @@ Return ONLY a JSON object with this exact shape. No explanation, no markdown, no
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-5-20251101',
     max_tokens: 4096,
+    ...(researchContext ? { system: researchContext } : {}),
     messages: [
       {
         role: 'user',
@@ -808,6 +853,14 @@ export async function synthesizePersonas(projectId: string): Promise<{ error?: s
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const { data: projectData } = await supabase
+    .from('project')
+    .select('ux_research_brief')
+    .eq('id', projectId)
+    .single()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const researchContext = buildResearchContext((projectData as any)?.ux_research_brief ?? null)
+
   // All research inputs across all flows in this project
   const { data: inputs } = await supabase
     .from('research_input')
@@ -871,6 +924,7 @@ Pain points: ${p.pain_points}`
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-5-20251101',
     max_tokens: 8096,
+    ...(researchContext ? { system: researchContext } : {}),
     messages: [
       {
         role: 'user',
@@ -1094,6 +1148,14 @@ export async function synthesizeFlow(
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const { data: projectData } = await supabase
+    .from('project')
+    .select('ux_research_brief')
+    .eq('id', projectId)
+    .single()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const researchContext = buildResearchContext((projectData as any)?.ux_research_brief ?? null)
+
   // Inputs scoped to this flow
   const { data: inputs } = await supabase
     .from('research_input')
@@ -1140,6 +1202,7 @@ export async function synthesizeFlow(
   const message = await anthropic.messages.create({
     model: 'claude-opus-4-5-20251101',
     max_tokens: 4096,
+    ...(researchContext ? { system: researchContext } : {}),
     messages: [
       {
         role: 'user',
@@ -1332,6 +1395,14 @@ export async function inferJourney(
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
 
+  const { data: projectData } = await supabase
+    .from('project')
+    .select('ux_research_brief')
+    .eq('id', projectId)
+    .single()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const researchContext = buildResearchContext((projectData as any)?.ux_research_brief ?? null)
+
   const { data: inputs } = await supabase
     .from('research_input')
     .select('id, type, content, source_label')
@@ -1371,6 +1442,7 @@ Business opportunity: ${r.business_opportunity}`
   const response = await anthropic.messages.create({
     model: 'claude-opus-4-6',
     max_tokens: 4096,
+    ...(researchContext ? { system: researchContext } : {}),
     messages: [
       {
         role: 'user',
