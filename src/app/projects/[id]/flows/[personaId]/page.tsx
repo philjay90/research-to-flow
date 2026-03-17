@@ -103,12 +103,12 @@ export default async function FlowDetailPage({
 
   const personaReqLinks = (allPersonaReqLinks ?? []) as { persona_id: string; requirement_id: string }[]
 
-  const activeTab = ['user-group', 'journey', 'canvas'].includes(tab) ? tab : 'user-group'
+  const activeTab = ['persona', 'journey', 'canvas'].includes(tab) ? tab : 'persona'
 
   const TAB_HELP: Record<string, string> = {
-    'user-group': 'The user group this flow is built around, including their goals and pain points.',
+    persona: 'The persona this flow is built around, including their goals and pain points.',
     journey: 'The user journey stages and linked requirements for this flow.',
-    canvas: 'The happy path flow canvas for this user group.',
+    canvas: 'The happy path flow canvas for this persona.',
   }
 
   const isCanvas = activeTab === 'canvas'
@@ -127,7 +127,7 @@ export default async function FlowDetailPage({
         <div className="flex items-end justify-between border-b border-[#E5E5EA] mb-8">
           <div className="flex items-end">
             {[
-              { key: 'user-group', label: 'User Group' },
+              { key: 'persona',    label: 'Persona' },
               { key: 'journey',    label: 'Journey' },
               { key: 'canvas',     label: 'Canvas' },
             ].map(({ key, label }) => (
@@ -156,8 +156,8 @@ export default async function FlowDetailPage({
           </div>
         </div>
 
-        {/* ── USER GROUP TAB ── */}
-        {activeTab === 'user-group' && (
+        {/* ── PERSONA TAB ── */}
+        {activeTab === 'persona' && (
           <div>
             {/* Page header */}
             <div className="mb-8">
