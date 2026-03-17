@@ -3,9 +3,8 @@ import { createClient } from '@/lib/supabase'
 import type { Project } from '@/types'
 import { Button } from '@/components/ui/button'
 import { AppHeader } from '@/app/components/AppHeader'
-import { DeleteButton } from '@/app/components/DeleteButton'
 import { HelpTooltip } from '@/app/components/HelpTooltip'
-import { deleteProject } from '@/app/actions'
+import { ProjectCard } from '@/app/components/ProjectCard'
 
 export default async function HomePage() {
   const supabase = await createClient()
@@ -46,25 +45,12 @@ export default async function HomePage() {
           <ul className="space-y-4">
             {(projects as Project[]).map((project) => (
               <li key={project.id}>
-                <div className="group rounded-2xl bg-white shadow-sm transition-shadow hover:shadow-md">
-                  <div className="flex items-center gap-4 p-6">
-                    <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
-                      <p className="font-semibold text-foreground text-base">
-                        {project.name}
-                      </p>
-                      {project.description && (
-                        <p className="mt-1 text-sm text-foreground leading-relaxed">{project.description}</p>
-                      )}
-                      <p className="mt-2 text-xs text-foreground/50">
-                        Created {new Date(project.created_at).toLocaleDateString()}
-                      </p>
-                    </Link>
-                    <DeleteButton
-                      action={deleteProject.bind(null, project.id)}
-                      confirmMessage={`Delete "${project.name}"? This will permanently remove all research inputs, requirements, and flows. This cannot be undone.`}
-                    />
-                  </div>
-                </div>
+                <ProjectCard
+                  id={project.id}
+                  name={project.name}
+                  description={project.description}
+                  createdAt={project.created_at}
+                />
               </li>
             ))}
           </ul>
