@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,8 +46,33 @@ export function EditableInputCard({
   const [labelVal, setLabelVal] = useState(sourceLabel ?? '')
   const [contentVal, setContentVal] = useState(content)
   const [isPending, startTransition] = useTransition()
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isClamped, setIsClamped] = useState(false)
   const contentRef = useRef<HTMLTextAreaElement>(null)
+  const viewContentRef = useRef<HTMLParagraphElement>(null)
   const router = useRouter()
+
+  // Detect whether the collapsed content is actually being clamped.
+  // Re-check whenever content changes (e.g. after an edit).
+  const checkClamped = useCallback(() => {
+    const el = viewContentRef.current
+    if (!el) return
+    // Temporarily remove line-clamp so we can measure true scrollHeight
+    el.style.webkitLineClamp = 'unset'
+    const overflows = el.scrollHeight > el.clientHeight + 2 // +2 for rounding
+    el.style.webkitLineClamp = ''
+    setIsClamped(overflows)
+  }, [])
+
+  useEffect(() => {
+    checkClamped()
+    // Also recheck if the element is resized (e.g. column width changes)
+    const el = viewContentRef.current
+    if (!el) return
+    const ro = new ResizeObserver(checkClamped)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [content, checkClamped])
 
   useEffect(() => {
     if (editing) {
@@ -176,9 +201,33 @@ export function EditableInputCard({
         {INPUT_TYPE_LABELS[type] ?? type}
       </Badge>
 
-      <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
+      <p
+        ref={viewContentRef}
+        className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
+        style={
+          !isExpanded
+            ? {
+                display: '-webkit-box',
+                WebkitLineClamp: 5,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }
+            : undefined
+        }
+      >
         {content}
       </p>
+
+      {/* Expand / collapse toggle — only rendered when content actually overflows */}
+      {isClamped && (
+        <button
+          onClick={() => setIsExpanded((v) => !v)}
+          className="mt-2 text-xs font-medium text-[#86868B] hover:text-[#1D1D1F] transition-colors"
+        >
+          {isExpanded ? 'Show less ↑' : 'Show more ↓'}
+        </button>
+      )}
+
       {attachmentUrl && (
         <img
           src={attachmentUrl}
