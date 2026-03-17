@@ -11,6 +11,7 @@ import { PersonaDetailClient } from '../../personas/[personaId]/PersonaDetailCli
 import { FlowCanvasWrapper } from '@/app/components/FlowCanvasWrapper'
 import { AddInputButton } from '@/app/components/AddInputButton'
 import { SynthesizeFlowButton } from '@/app/components/SynthesizeFlowButton'
+import { RegeneratePersonaButton } from '@/app/components/RegeneratePersonaButton'
 import { EditableInputCard } from '@/app/components/EditableInputCard'
 import { DeleteAllButton } from '@/app/components/DeleteAllButton'
 import { deleteResearchInput, deleteAllFlowInputs } from '@/app/actions'
@@ -195,6 +196,9 @@ export default async function FlowDetailPage({
                 <SynthesizeFlowButton projectId={id} personaId={personaId} />
                 <AddInputButton projectId={id} flowId={personaId} />
               </div>
+            )}
+            {activeTab === 'persona' && (
+              <RegeneratePersonaButton projectId={id} personaId={personaId} />
             )}
             {activeTab === 'journey' && (
               <GenerateJourneyButton

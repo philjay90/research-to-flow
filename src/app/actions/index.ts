@@ -1088,7 +1088,8 @@ export async function createEmptyPersona(projectId: string): Promise<{ id?: stri
 
 export async function synthesizeFlow(
   projectId: string,
-  personaId: string
+  personaId: string,
+  overwriteManual = false
 ): Promise<{ error?: string; success?: boolean }> {
   const { supabase, user } = await getClientAndUser()
   if (!user) return { error: 'Not authenticated' }
@@ -1221,8 +1222,8 @@ ${requirementsSummary}`,
   const newProvenance = { ...existingProvenance }
 
   for (const field of PERSONA_FIELDS) {
-    if (existingProvenance[field]?.source === 'manual') {
-      // Preserve manually edited fields
+    if (!overwriteManual && existingProvenance[field]?.source === 'manual') {
+      // Preserve manually edited fields unless the caller opts to overwrite
     } else {
       updates[field] = result[field as keyof PersonaResult]
       newProvenance[field] = result.field_provenance[field] ?? { source: 'llm_inferred', input_ids: [] }
