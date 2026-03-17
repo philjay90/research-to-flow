@@ -35,6 +35,8 @@ export function MockupPanel({
   const [subTab, setSubTab] = useState<MockupSubTab>('preview')
   const [copied, setCopied] = useState(false)
   const [isActing, setIsActing] = useState(false)
+  const [elapsed, setElapsed] = useState(0)
+  const startedAt = useState(() => Date.now())[0]
 
   // Poll for status while pending/running
   const poll = useCallback(async () => {
@@ -53,6 +55,13 @@ export function MockupPanel({
     const id = setInterval(poll, 3000)
     return () => clearInterval(id)
   }, [status, poll])
+
+  // Elapsed timer while generating
+  useEffect(() => {
+    if (status !== 'pending' && status !== 'running') return
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000)
+    return () => clearInterval(id)
+  }, [status, startedAt])
 
   // When status becomes complete, reload the page to get the new data
   const prevStatus = useState(initialStatus)[0]
@@ -98,13 +107,57 @@ export function MockupPanel({
   }
 
   if (status === 'pending' || status === 'running') {
+    const mins = Math.floor(elapsed / 60)
+    const secs = elapsed % 60
+    const elapsedStr = mins > 0
+      ? `${mins}m ${secs}s`
+      : `${secs}s`
+
+    const STEPS = [
+      'Analysing design direction',
+      'Generating screen specs',
+      'Building HTML prototype',
+    ]
+    // Estimate step based on elapsed time (~30s per step)
+    const estimatedStep = Math.min(Math.floor(elapsed / 30), 2)
+
     return (
-      <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20 text-center shadow-sm">
-        <Loader2 className="h-6 w-6 animate-spin text-[#86868B] mb-3" />
-        <p className="text-sm font-medium text-[#1D1D1F]">
-          {status === 'pending' ? 'Queued…' : 'Generating mockup'}
+      <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm">
+        <Loader2 className="h-6 w-6 animate-spin text-[#86868B] mb-4" />
+        <p className="text-sm font-semibold text-[#1D1D1F] mb-1">
+          {status === 'pending' ? 'Queued — starting soon…' : 'Generating mockup'}
         </p>
-        <p className="mt-1 text-xs text-[#86868B]"><LoadingDots /></p>
+        <p className="text-xs text-[#86868B] mb-6">
+          {elapsed > 0 ? `Running for ${elapsedStr}` : 'This usually takes 1–3 minutes'}
+        </p>
+
+        {status === 'running' && (
+          <ol className="space-y-2 text-left mb-6">
+            {STEPS.map((step, i) => (
+              <li key={i} className="flex items-center gap-2 text-xs">
+                {i < estimatedStep ? (
+                  <span className="text-green-500 font-bold">✓</span>
+                ) : i === estimatedStep ? (
+                  <Loader2 className="h-3 w-3 animate-spin text-[#86868B] shrink-0" />
+                ) : (
+                  <span className="h-3 w-3 rounded-full border border-[#D2D2D7] shrink-0 inline-block" />
+                )}
+                <span className={i <= estimatedStep ? 'text-[#1D1D1F]' : 'text-[#86868B]'}>
+                  {step}
+                </span>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {elapsed > 180 && (
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-[#86868B] underline underline-offset-2 hover:text-[#1D1D1F] transition-colors"
+          >
+            Taking longer than expected — click to refresh
+          </button>
+        )}
       </div>
     )
   }
