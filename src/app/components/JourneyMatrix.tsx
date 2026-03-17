@@ -340,6 +340,7 @@ function RequirementMiniCard({
   projectId,
   onOpenModal,
   isDropped,
+  rowPersonaId,
 }: {
   requirement: Requirement
   personas: Persona[]
@@ -347,10 +348,12 @@ function RequirementMiniCard({
   projectId: string
   onOpenModal: () => void
   isDropped?: boolean
+  rowPersonaId: string | null
 }) {
   const router = useRouter()
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: `req::${requirement.id}`,
+    // Encode the row's persona so handleDragEnd knows where the card came from
+    id: `req::${requirement.id}::${rowPersonaId ?? 'unlinked'}`,
   })
   const [linkedIds, setLinkedIds] = useState(() => new Set(initialLinkedPersonaIds))
   const [showPicker, setShowPicker] = useState(false)
@@ -582,6 +585,7 @@ export function JourneyMatrix({
   const router = useRouter()
   const [localReqs, setLocalReqs] = useState(requirements)
   const [localStages, setLocalStages] = useState(stages ?? [])
+  const [localPersonaLinks, setLocalPersonaLinks] = useState(personaReqLinks)
   const [activeReqId, setActiveReqId] = useState<string | null>(null)
   const [modalReqId, setModalReqId] = useState<string | null>(null)
   const [lastMove, setLastMove] = useState<LastMove | null>(null)
@@ -594,6 +598,7 @@ export function JourneyMatrix({
 
   useEffect(() => { setLocalReqs(requirements) }, [requirements])
   useEffect(() => { setLocalStages(stages ?? []) }, [stages])
+  useEffect(() => { setLocalPersonaLinks(personaReqLinks) }, [personaReqLinks])
   useEffect(() => () => { if (undoTimerRef.current) clearTimeout(undoTimerRef.current) }, [])
 
   // Keep top scrollbar phantom div width in sync with table scroll width
@@ -610,52 +615,89 @@ export function JourneyMatrix({
 
   const reqPersonaIds = useMemo(() => {
     const map = new Map<string, Set<string>>()
-    for (const link of personaReqLinks) {
+    for (const link of localPersonaLinks) {
       const set = map.get(link.requirement_id) ?? new Set<string>()
       set.add(link.persona_id)
       map.set(link.requirement_id, set)
     }
     return map
-  }, [personaReqLinks])
+  }, [localPersonaLinks])
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
   )
 
   function handleDragStart({ active }: DragStartEvent) {
-    setActiveReqId((active.id as string).replace('req::', ''))
+    // draggable id format: req::{reqId}::{rowPersonaId|'unlinked'}
+    setActiveReqId((active.id as string).split('::')[1])
   }
 
   function handleDragEnd({ active, over }: DragEndEvent) {
     setActiveReqId(null)
     if (!over) return
-    const reqId = (active.id as string).replace('req::', '')
-    const stagePart = (over.id as string).split('::')[0]
-    const newStage = stagePart === '__unassigned__' ? null : stagePart
+
+    // Parse source: req::{reqId}::{sourcePersonaId|'unlinked'}
+    const activeParts = (active.id as string).split('::')
+    const reqId = activeParts[1]
+    const sourcePersonaId = activeParts[2] === 'unlinked' ? null : (activeParts[2] ?? null)
+
+    // Parse target droppable: {stageKey}::{targetPersonaId|'unlinked'}
+    const overParts = (over.id as string).split('::')
+    const stageKey = overParts[0]
+    const targetPersonaId = overParts[1] === 'unlinked' ? null : (overParts[1] ?? null)
+    const newStage = stageKey === '__unassigned__' ? null : stageKey
+
     const current = localReqs.find((r) => r.id === reqId)
-    if (current?.journey_stage === newStage) return
+    const linkedIds = reqPersonaIds.get(reqId) ?? new Set<string>()
 
-    // Optimistic update
-    setLocalReqs((prev) => prev.map((r) => (r.id === reqId ? { ...r, journey_stage: newStage } : r)))
+    const stageChanged = current?.journey_stage !== newStage
+    // Link when dropped onto a persona row the requirement isn't yet linked to
+    const shouldLink = targetPersonaId !== null && !linkedIds.has(targetPersonaId)
+    // Unlink when dragged from a persona row and dropped onto the Unlinked row
+    const shouldUnlink =
+      sourcePersonaId !== null &&
+      targetPersonaId === null &&
+      linkedIds.has(sourcePersonaId)
 
-    // Trigger drop-in bounce after the overlay fly animation (500ms) completes
+    if (!stageChanged && !shouldLink && !shouldUnlink) return
+
+    // ── Stage update ────────────────────────────────────────────────────────
+    if (stageChanged) {
+      setLocalReqs((prev) => prev.map((r) => (r.id === reqId ? { ...r, journey_stage: newStage } : r)))
+      setLastMove({
+        reqId,
+        fromStage: current?.journey_stage ?? null,
+        toStage: newStage,
+        stageLabel: newStage ?? 'Unassigned',
+      })
+      if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
+      undoTimerRef.current = setTimeout(() => setLastMove(null), 6000)
+      updateRequirementStage(reqId, newStage, projectId).then(() => router.refresh())
+    }
+
+    // ── Persona link ────────────────────────────────────────────────────────
+    if (shouldLink) {
+      setLocalPersonaLinks((prev) => [
+        ...prev,
+        { persona_id: targetPersonaId, requirement_id: reqId },
+      ])
+      linkPersonaRequirement(targetPersonaId, reqId, projectId).then(() => router.refresh())
+    }
+
+    // ── Persona unlink ──────────────────────────────────────────────────────
+    if (shouldUnlink) {
+      setLocalPersonaLinks((prev) =>
+        prev.filter((l) => !(l.persona_id === sourcePersonaId && l.requirement_id === reqId))
+      )
+      unlinkPersonaRequirement(sourcePersonaId, reqId, projectId).then(() => router.refresh())
+    }
+
+    // Drop-in bounce animation (fires regardless of which change happened)
     if (dropClearRef.current) clearTimeout(dropClearRef.current)
     setTimeout(() => {
       setDroppedReqId(reqId)
       dropClearRef.current = setTimeout(() => setDroppedReqId(null), 600)
     }, 480)
-
-    // Record move for undo
-    setLastMove({
-      reqId,
-      fromStage: current?.journey_stage ?? null,
-      toStage: newStage,
-      stageLabel: newStage ?? 'Unassigned',
-    })
-    if (undoTimerRef.current) clearTimeout(undoTimerRef.current)
-    undoTimerRef.current = setTimeout(() => setLastMove(null), 6000)
-
-    updateRequirementStage(reqId, newStage, projectId).then(() => router.refresh())
   }
 
   function handleUndo() {
@@ -817,13 +859,14 @@ export function JourneyMatrix({
                           <DroppableCell id={droppableId}>
                             {cellReqs.map((req) => (
                               <RequirementMiniCard
-                                key={req.id}
+                                key={`${req.id}::${row.id ?? 'unlinked'}`}
                                 requirement={req}
                                 personas={personas}
                                 initialLinkedPersonaIds={reqPersonaIds.get(req.id) ?? new Set()}
                                 projectId={projectId}
                                 onOpenModal={() => setModalReqId(req.id)}
                                 isDropped={req.id === droppedReqId}
+                                rowPersonaId={row.id}
                               />
                             ))}
                           </DroppableCell>
