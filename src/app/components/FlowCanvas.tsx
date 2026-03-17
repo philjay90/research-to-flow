@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   ReactFlow,
   Background,
@@ -24,6 +25,7 @@ import {
 import '@xyflow/react/dist/style.css'
 import { saveNodePosition, saveEdge, deleteEdge, generateFlow } from '@/app/actions'
 import { LoadingDots } from '@/app/components/LoadingDots'
+import { NodeRequirementModal } from '@/app/components/NodeRequirementModal'
 import type { FlowNode, FlowEdge, Requirement } from '@/types'
 
 // Brand palette constants
@@ -188,7 +190,7 @@ function LabelledEdge({
 function StepNode({ data }: { data: Record<string, unknown> }) {
   return (
     <div
-      style={{ width: 220, border: `2.5px solid ${STEP_COLOR}` }}
+      style={{ width: 220, border: `2.5px solid ${STEP_COLOR}`, cursor: 'pointer' }}
       className="rounded-xl bg-white shadow-md"
     >
       <Handle type="target" position={Position.Top} style={{ background: STEP_COLOR, borderColor: '#fff', width: 10, height: 10 }} />
@@ -206,7 +208,7 @@ function StepNode({ data }: { data: Record<string, unknown> }) {
 
 function DecisionNode({ data }: { data: Record<string, unknown> }) {
   return (
-    <div style={{ position: 'relative', width: DEC_W, height: DEC_H }}>
+    <div style={{ position: 'relative', width: DEC_W, height: DEC_H, cursor: 'pointer' }}>
       <svg
         style={{ position: 'absolute', inset: 0, overflow: 'visible' }}
         width={DEC_W}
@@ -289,7 +291,9 @@ function maxDate(dates: (string | null | undefined)[]): string | null {
 // ── Canvas ───────────────────────────────────────────────────────────────────
 
 export default function FlowCanvas({ projectId, initialPersonaId = '', initialNodes, initialEdges, requirements, personas }: Props) {
+  const router = useRouter()
   const [selectedPersonaId, setSelectedPersonaId] = useState<string>(initialPersonaId)
+  const [modalReq, setModalReq] = useState<Requirement | null>(null)
 
   // Derive the subset of nodes/edges for the current persona selection.
   // Lane header nodes (type === 'laneHeader') are always included — they are project-level
@@ -419,6 +423,19 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
     })
   }
 
+  // Open the requirement modal when a step or decision node is clicked
+  const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+    if (node.type === 'laneHeaderNode') return
+    const flowNode = initialNodes.find((n) => n.id === node.id)
+    if (!flowNode?.requirement_id) return
+    const req = requirements.find((r) => r.id === flowNode.requirement_id)
+    if (req) setModalReq(req)
+  }, [initialNodes, requirements])
+
+  const handleSaved = useCallback(() => {
+    router.refresh()
+  }, [router])
+
   return (
     <div className="relative h-full w-full">
       {/* Toolbar: persona selector + generate button */}
@@ -476,6 +493,7 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
         onConnect={onConnect}
         onEdgesDelete={onEdgesDelete}
         onNodeDragStop={onNodeDragStop}
+        onNodeClick={onNodeClick}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{ type: 'labelledEdge' }}
@@ -489,6 +507,16 @@ export default function FlowCanvas({ projectId, initialPersonaId = '', initialNo
           maskColor="rgba(243,247,240,0.7)"
         />
       </ReactFlow>
+
+      {/* Requirement detail / edit modal — opens when a step or decision node is clicked */}
+      {modalReq && (
+        <NodeRequirementModal
+          requirement={modalReq}
+          projectId={projectId}
+          onClose={() => setModalReq(null)}
+          onSaved={handleSaved}
+        />
+      )}
     </div>
   )
 }
