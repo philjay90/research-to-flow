@@ -48,7 +48,7 @@ export function RegeneratePersonaButton({ projectId, personaId }: Props) {
     <>
       <button
         onClick={() => { setIsOpen(true); setOverwrite(false); setError(null) }}
-        className="flex h-9 items-center rounded-full border border-[#E5E5EA] bg-white px-5 text-sm font-medium text-[#1D1D1F] hover:border-[#1D1D1F] transition-colors"
+        className="flex h-9 items-center rounded-full bg-[#F0E100] px-5 text-sm font-semibold text-[#1D1D1F] hover:bg-[#d4c900] disabled:opacity-50 transition-colors min-w-[160px] justify-center"
       >
         ↺ Re-generate
       </button>
