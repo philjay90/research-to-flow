@@ -2,15 +2,11 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import {
-  addResearchInput,
   deleteResearchInput,
   deleteAllInputs,
 } from '@/app/actions'
 import type { Project, ResearchInput, Requirement, Persona, FlowNode, FlowEdge } from '@/types'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
 import { AppHeader } from '@/app/components/AppHeader'
 import { DeleteAllButton } from '@/app/components/DeleteAllButton'
 import { EditableInputCard } from '@/app/components/EditableInputCard'
@@ -19,15 +15,8 @@ import { SynthesizePersonasButton } from '@/app/components/SynthesizePersonasBut
 import { HelpTooltip } from '@/app/components/HelpTooltip'
 import { JourneyMatrix } from '@/app/components/JourneyMatrix'
 import { GenerateJourneyButton } from '@/app/components/GenerateJourneyButton'
+import { AddInputButton } from '@/app/components/AddInputButton'
 import FlowCanvas from '@/app/components/FlowCanvas'
-
-const INPUT_TYPE_LABELS: Record<string, string> = {
-  interview_notes: 'Notes',
-  transcript: 'Transcript',
-  screenshot: 'Screenshot',
-  business_requirements: 'Business Requirements',
-  other: 'Other',
-}
 
 export default async function ProjectPage({
   params,
@@ -156,6 +145,9 @@ export default async function ProjectPage({
           </div>
 
           <div className="pb-2">
+            {activeTab === 'inputs' && (
+              <AddInputButton projectId={id} />
+            )}
             {activeTab === 'personas' && (
               <SynthesizePersonasButton projectId={id} />
             )}
@@ -167,116 +159,44 @@ export default async function ProjectPage({
 
         {/* ── INPUTS TAB ── */}
         {activeTab === 'inputs' && (
-          <div className="space-y-6">
-            {/* Add input form — always at the top */}
-            <div className="rounded-2xl bg-white p-6 shadow-sm">
-              <p className="mb-3 text-sm font-semibold text-[#1D1D1F]">Add Research Input</p>
-              <p className="mb-5 text-sm text-[#86868B] leading-relaxed">
-                Paste notes, a transcript, or describe a screenshot.
+          ins.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-20 text-center shadow-sm">
+              <p className="text-lg font-medium text-[#1D1D1F]">No inputs yet</p>
+              <p className="mt-2 text-sm text-[#86868B] max-w-sm">
+                Add research inputs like interview notes, transcripts, or screenshots to get started.
               </p>
-              <form action={addResearchInput} className="space-y-4">
-                <input type="hidden" name="project_id" value={id} />
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="type" className="text-sm font-semibold text-[#1D1D1F]">
-                    Type <span className="text-[#C97D60]">*</span>
-                  </Label>
-                  <select
-                    id="type"
-                    name="type"
-                    required
-                    className="block w-full rounded-xl border border-border bg-card px-3 py-2 text-sm text-foreground focus:border-[#1D1D1F] focus:outline-none focus:ring-1 focus:ring-[#1D1D1F]"
-                  >
-                    <option value="">Select a type...</option>
-                    {Object.entries(INPUT_TYPE_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="source_label" className="text-sm font-semibold text-[#1D1D1F]">
-                    Title / Source Label
-                  </Label>
-                  <Input
-                    id="source_label"
-                    name="source_label"
-                    type="text"
-                    placeholder="e.g. Interview with Sarah"
-                    className="rounded-xl"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="content" className="text-sm font-semibold text-[#1D1D1F]">
-                    Content <span className="text-[#C97D60]">*</span>
-                  </Label>
-                  <Textarea
-                    id="content"
-                    name="content"
-                    rows={4}
-                    required
-                    placeholder="Paste notes, transcript excerpt, or describe the screenshot..."
-                    className="rounded-xl"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="attachment" className="text-sm font-semibold text-[#1D1D1F]">
-                    Attachment{' '}
-                    <span className="font-normal text-[#86868B]">(optional)</span>
-                  </Label>
-                  <input
-                    id="attachment"
-                    name="attachment"
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="block w-full text-sm text-foreground file:mr-3 file:rounded-full file:border-0 file:bg-[#1D1D1F] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-[#1D1D1F]/80"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  className="bg-[#F0E100] text-[#1D1D1F] hover:bg-[#d4c900] rounded-full px-6 font-semibold"
-                >
-                  Add Input
-                </Button>
-              </form>
             </div>
-
-            {/* Existing inputs */}
-            {ins.length > 0 && (
-              <>
-                <ul className="space-y-3">
-                  {ins.map((input) => {
-                    const synthAt = lastSynthAt.get(input.id)
-                    const isSynthesized = !!synthAt
-                    const isModified = isSynthesized && input.updated_at > synthAt!
-                    return (
-                      <li key={input.id}>
-                        <EditableInputCard
-                          inputId={input.id}
-                          projectId={id}
-                          type={input.type}
-                          sourceLabel={input.source_label}
-                          content={input.content}
-                          attachmentUrl={input.attachment_url}
-                          isSynthesized={isSynthesized}
-                          isModified={isModified}
-                          onDelete={deleteResearchInput.bind(null, input.id, id)}
-                        />
-                      </li>
-                    )
-                  })}
-                </ul>
-                <DeleteAllButton
-                  action={deleteAllInputs.bind(null, id)}
-                  label="Delete all inputs"
-                  confirmMessage="Delete ALL inputs for this project? This cannot be undone."
-                />
-              </>
-            )}
-          </div>
+          ) : (
+            <div className="space-y-6">
+              <ul className="space-y-3">
+                {ins.map((input) => {
+                  const synthAt = lastSynthAt.get(input.id)
+                  const isSynthesized = !!synthAt
+                  const isModified = isSynthesized && input.updated_at > synthAt!
+                  return (
+                    <li key={input.id}>
+                      <EditableInputCard
+                        inputId={input.id}
+                        projectId={id}
+                        type={input.type}
+                        sourceLabel={input.source_label}
+                        content={input.content}
+                        attachmentUrl={input.attachment_url}
+                        isSynthesized={isSynthesized}
+                        isModified={isModified}
+                        onDelete={deleteResearchInput.bind(null, input.id, id)}
+                      />
+                    </li>
+                  )
+                })}
+              </ul>
+              <DeleteAllButton
+                action={deleteAllInputs.bind(null, id)}
+                label="Delete all inputs"
+                confirmMessage="Delete ALL inputs for this project? This cannot be undone."
+              />
+            </div>
+          )
         )}
 
         {/* ── USER JOURNEYS TAB ── */}
