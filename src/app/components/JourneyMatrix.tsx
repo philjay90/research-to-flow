@@ -490,9 +490,11 @@ function DragCard({ requirement }: { requirement: Requirement }) {
 function EditableColumnHeader({
   name,
   onRename,
+  dark = false,
 }: {
   name: string
   onRename: (newName: string) => void
+  dark?: boolean
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(name)
@@ -525,7 +527,11 @@ function EditableColumnHeader({
         onChange={(e) => setDraft(e.target.value)}
         onBlur={commit}
         onKeyDown={handleKeyDown}
-        className="w-full bg-transparent text-xs font-semibold uppercase tracking-wide text-[#1D1D1F] focus:outline-none border-b border-[#86868B] pb-0.5"
+        className={`w-full bg-transparent text-xs font-semibold uppercase tracking-wide focus:outline-none pb-0.5 ${
+          dark
+            ? 'text-white border-b border-white/40'
+            : 'text-[#1D1D1F] border-b border-[#86868B]'
+        }`}
         autoFocus
       />
     )
@@ -534,7 +540,11 @@ function EditableColumnHeader({
   return (
     <button
       onClick={startEdit}
-      className="group flex items-center gap-1 text-left text-xs font-semibold text-[#86868B] uppercase tracking-wide hover:text-[#1D1D1F] transition-colors"
+      className={`group flex items-center gap-1 text-left text-xs font-semibold uppercase tracking-wide transition-colors ${
+        dark
+          ? 'text-white/70 hover:text-white'
+          : 'text-[#86868B] hover:text-[#1D1D1F]'
+      }`}
       title="Click to rename"
     >
       <span>{name}</span>
@@ -762,23 +772,24 @@ export function JourneyMatrix({
         >
           <table className="min-w-full border-collapse" style={{ height: '1px' }}>
             <thead>
-              <tr className="bg-[#F5F5F7]">
-                <th className="sticky left-0 z-10 bg-[#F5F5F7] min-w-[140px] w-[140px] px-4 py-3 text-left text-xs font-semibold text-[#86868B] uppercase tracking-wide border-b border-r border-[#E5E5EA]">
+              <tr className="bg-[#1D1D1F]">
+                <th className="sticky left-0 z-10 bg-[#1D1D1F] min-w-[140px] w-[140px] px-4 py-3 text-left text-xs font-semibold text-white/50 uppercase tracking-wide border-b border-r border-white/10">
                   Persona
                 </th>
                 {allColumns.map((col) => (
                   <th
                     key={col}
-                    className="min-w-[220px] w-[220px] px-4 py-3 text-left border-b border-r border-[#E5E5EA] last:border-r-0"
+                    className="min-w-[220px] w-[220px] px-4 py-3 text-left border-b border-r border-white/10 last:border-r-0"
                   >
                     {col === 'Unassigned' ? (
-                      <span className="text-xs font-semibold text-[#86868B] uppercase tracking-wide">
+                      <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">
                         Unassigned
                       </span>
                     ) : (
                       <EditableColumnHeader
                         name={col}
                         onRename={(newName) => handleRenameStage(col, newName)}
+                        dark
                       />
                     )}
                   </th>
