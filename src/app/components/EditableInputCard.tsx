@@ -53,15 +53,13 @@ export function EditableInputCard({
   const router = useRouter()
 
   // Detect whether the collapsed content is actually being clamped.
-  // Re-check whenever content changes (e.g. after an edit).
+  // With overflow:hidden + -webkit-line-clamp, scrollHeight is always the full
+  // content height while clientHeight is the visible (clamped) height, so a
+  // simple comparison is enough — no need to toggle the clamp.
   const checkClamped = useCallback(() => {
     const el = viewContentRef.current
     if (!el) return
-    // Temporarily remove line-clamp so we can measure true scrollHeight
-    el.style.webkitLineClamp = 'unset'
-    const overflows = el.scrollHeight > el.clientHeight + 2 // +2 for rounding
-    el.style.webkitLineClamp = ''
-    setIsClamped(overflows)
+    setIsClamped(el.scrollHeight > el.clientHeight + 2) // +2 for sub-pixel rounding
   }, [])
 
   useEffect(() => {
