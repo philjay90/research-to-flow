@@ -65,7 +65,7 @@ export default async function PersonaDetailPage({
       <AppHeader
         crumbs={[
           { label: project.name, href: `/projects/${id}` },
-          { label: 'Personas', href: `/projects/${id}?tab=personas` },
+          { label: 'Flows', href: `/projects/${id}?tab=flows` },
           { label: p.name },
         ]}
       />

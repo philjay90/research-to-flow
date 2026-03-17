@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect, useCallback } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -46,38 +46,8 @@ export function EditableInputCard({
   const [labelVal, setLabelVal] = useState(sourceLabel ?? '')
   const [contentVal, setContentVal] = useState(content)
   const [isPending, startTransition] = useTransition()
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [isClamped, setIsClamped] = useState(false)
   const contentRef = useRef<HTMLTextAreaElement>(null)
-  const viewContentRef = useRef<HTMLParagraphElement>(null)
-  const isExpandedRef = useRef(false)
   const router = useRouter()
-
-  // Keep ref in sync so checkClamped can read it without a stale closure
-  useEffect(() => { isExpandedRef.current = isExpanded }, [isExpanded])
-
-  // Detect whether the collapsed content is actually being clamped.
-  // Skip the check while expanded — the element has no height constraint then,
-  // so scrollHeight === clientHeight which would wrongly clear isClamped and
-  // hide the "Show less" button.
-  const checkClamped = useCallback(() => {
-    if (isExpandedRef.current) return
-    const el = viewContentRef.current
-    if (!el) return
-    setIsClamped(el.scrollHeight > el.clientHeight + 2)
-  }, [])
-
-  useEffect(() => {
-    // Reset when content changes so a newly-shortened edit removes the toggle
-    setIsClamped(false)
-    setIsExpanded(false)
-    checkClamped()
-    const el = viewContentRef.current
-    if (!el) return
-    const ro = new ResizeObserver(checkClamped)
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [content, checkClamped])
 
   useEffect(() => {
     if (editing) {
@@ -206,38 +176,12 @@ export function EditableInputCard({
         {INPUT_TYPE_LABELS[type] ?? type}
       </Badge>
 
-      {/* Scrollable wrapper when expanded (caps at ~20 lines) */}
-      <div
-        style={isExpanded ? { maxHeight: '460px', overflowY: 'auto' } : undefined}
-        className={isExpanded ? 'pr-1' : undefined}
-      >
-        <p
-          ref={viewContentRef}
-          className="whitespace-pre-wrap text-sm text-foreground leading-relaxed"
-          style={
-            !isExpanded
-              ? {
-                  display: '-webkit-box',
-                  WebkitLineClamp: 5,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }
-              : undefined
-          }
-        >
+      {/* Content — capped at 15 lines with scroll */}
+      <div style={{ maxHeight: '345px', overflowY: 'auto' }}>
+        <p className="whitespace-pre-wrap text-sm text-foreground leading-relaxed">
           {content}
         </p>
       </div>
-
-      {/* Expand / collapse toggle — only rendered when content actually overflows 5 lines */}
-      {isClamped && (
-        <button
-          onClick={() => setIsExpanded((v) => !v)}
-          className="mt-2 text-xs font-medium text-[#86868B] hover:text-[#1D1D1F] transition-colors"
-        >
-          {isExpanded ? 'Show less ↑' : 'Show more ↓'}
-        </button>
-      )}
 
       {attachmentUrl && (
         <img
