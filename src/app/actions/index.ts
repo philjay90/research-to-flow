@@ -827,45 +827,6 @@ ${requirementsSummary}`,
     }
   }
 
-  // Fire UX Design Agent (fire-and-forget) when generating for a specific persona
-  if (personaId) {
-    const { data: freshNodes } = await supabase
-      .from('flow_node')
-      .select('*')
-      .eq('project_id', projectId)
-      .is('flow_id', null)
-    const { data: freshEdges } = await supabase
-      .from('flow_edge')
-      .select('*')
-      .eq('project_id', projectId)
-      .is('flow_id', null)
-    const { data: currentPersona } = await supabase
-      .from('persona')
-      .select('mockup_status, mockup_canvas_hash')
-      .eq('id', personaId)
-      .single()
-
-    const { computeCanvasHash } = await import('@/lib/agents/canvas-hash')
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const newHash = computeCanvasHash((freshNodes ?? []) as any, (freshEdges ?? []) as any)
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const personaMockup = currentPersona as any
-    if (personaMockup?.mockup_status === 'complete' && personaMockup?.mockup_canvas_hash !== newHash) {
-      // Canvas changed — flag diff, let user decide whether to update mockup
-      await supabase
-        .from('persona')
-        .update({ mockup_pending_diff: true, mockup_canvas_hash: newHash })
-        .eq('id', personaId)
-    } else {
-      // First run or re-run: mark pending — MockupPanel calls the API route to actually run
-      await supabase
-        .from('persona')
-        .update({ mockup_status: 'pending', mockup_pending_diff: false })
-        .eq('id', personaId)
-    }
-  }
-
   return { success: true }
 }
 
@@ -1625,30 +1586,3 @@ export async function renameStage(
   revalidatePath(`/projects/${projectId}`)
 }
 
-// ---------------------------------------------------------------------------
-// UX Design Agent actions
-// ---------------------------------------------------------------------------
-
-export async function rerunMockup(
-  projectId: string,
-  personaId: string
-): Promise<{ error?: string }> {
-  const { supabase } = await getClientAndUser()
-
-  // Only set DB status — the client MockupPanel calls the API route to actually run the agent
-  await supabase
-    .from('persona')
-    .update({ mockup_status: 'pending', mockup_pending_diff: false })
-    .eq('id', personaId)
-
-  revalidatePath(`/projects/${projectId}/flows/${personaId}`)
-  return {}
-}
-
-export async function dismissMockupDiff(personaId: string): Promise<void> {
-  const { supabase } = await getClientAndUser()
-  await supabase
-    .from('persona')
-    .update({ mockup_pending_diff: false })
-    .eq('id', personaId)
-}
