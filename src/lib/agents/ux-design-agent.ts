@@ -1,10 +1,19 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { createClient } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { computeCanvasHash } from './canvas-hash'
 import { DESIGN_SYSTEMS_KB } from './design-systems'
 import type { FlowNode, FlowEdge, Persona, Requirement } from '@/types'
 
 const anthropic = new Anthropic()
+
+// Service-role client — bypasses RLS, no cookie/session dependency.
+// Safe to call from API routes, edge functions, or any server context.
+function getDb() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+}
 
 export async function runUxDesignAgent({
   projectId,
@@ -12,41 +21,38 @@ export async function runUxDesignAgent({
 }: {
   projectId: string
   personaId: string
-}) {
-  const supabase = await createClient()
-
-  const [{ data: persona }, { data: nodes }, { data: edges }, { data: requirements }] =
-    await Promise.all([
-      supabase.from('persona').select('*').eq('id', personaId).single(),
-      supabase.from('flow_node').select('*').eq('project_id', projectId).is('flow_id', null),
-      supabase.from('flow_edge').select('*').eq('project_id', projectId).is('flow_id', null),
-      supabase.from('requirement').select('*').eq('project_id', projectId),
-    ])
-
-  if (!persona) return
-
-  const typedPersona = persona as Persona
-  const typedNodes = (nodes ?? []) as FlowNode[]
-  const typedEdges = (edges ?? []) as FlowEdge[]
-  const typedReqs = (requirements ?? []) as Requirement[]
-
-  await supabase.from('persona').update({ mockup_status: 'running' }).eq('id', personaId)
-
-  const canvasHash = computeCanvasHash(typedNodes, typedEdges)
-  const canvasSummary = buildCanvasSummary(typedNodes, typedReqs)
-  const personaSummary = buildPersonaSummary(typedPersona)
+}): Promise<{ error?: string }> {
+  const db = getDb()
 
   try {
-    // Single combined call — visual direction + screen specs in one round trip
-    // Using max_tokens: 1000 keeps response time under 10s even on Haiku
+    const [{ data: persona }, { data: nodes }, { data: edges }, { data: requirements }] =
+      await Promise.all([
+        db.from('persona').select('*').eq('id', personaId).single(),
+        db.from('flow_node').select('*').eq('project_id', projectId).is('flow_id', null),
+        db.from('flow_edge').select('*').eq('project_id', projectId).is('flow_id', null),
+        db.from('requirement').select('*').eq('project_id', projectId),
+      ])
+
+    if (!persona) return {}
+
+    const typedPersona = persona as Persona
+    const typedNodes = (nodes ?? []) as FlowNode[]
+    const typedEdges = (edges ?? []) as FlowEdge[]
+    const typedReqs = (requirements ?? []) as Requirement[]
+
+    await db.from('persona').update({ mockup_status: 'running' }).eq('id', personaId)
+
+    const canvasHash = computeCanvasHash(typedNodes, typedEdges)
+    const canvasSummary = buildCanvasSummary(typedNodes, typedReqs)
+    const personaSummary = buildPersonaSummary(typedPersona)
+
     const res = await anthropic.messages.create({
       model: 'claude-3-5-haiku-20241022',
       max_tokens: 1000,
       system: DESIGN_SYSTEMS_KB,
-      messages: [
-        {
-          role: 'user',
-          content: `Design a UX mockup for this user flow. Return raw JSON only — no markdown, no preamble.
+      messages: [{
+        role: 'user',
+        content: `Design a UX mockup for this user flow. Return raw JSON only — no markdown, no preamble.
 
 Persona: ${personaSummary}
 
@@ -60,43 +66,59 @@ Return exactly this shape:
 }
 
 Limit to the 5 most important screens. Max 3 components per screen.`,
-        },
-      ],
-    }, { timeout: 20000 })
+      }],
+    }, { timeout: 50000 })
 
     const parsed = parseJson(res)
     const visualDirection = parsed.direction ?? {}
     const screens = Array.isArray(parsed.screens) ? parsed.screens : []
-
-    // Step 3: HTML Prototype (deterministic — built from screen specs, no LLM call)
     const prototypeHtml = buildPrototypeHtml(screens, visualDirection, typedPersona.name)
-
-    // Step 4: Figma JSON (deterministic — no LLM call)
     const figmaJson = buildFigmaJson(screens, visualDirection, typedPersona.name)
 
-    await supabase
-      .from('persona')
-      .update({
-        mockup_status: 'complete',
-        mockup_visual_direction: visualDirection,
-        mockup_screens: screens,
-        mockup_prototype_html: prototypeHtml,
-        mockup_figma_json: figmaJson,
-        mockup_canvas_hash: canvasHash,
-        mockup_pending_diff: false,
-      })
-      .eq('id', personaId)
+    await db.from('persona').update({
+      mockup_status: 'complete',
+      mockup_visual_direction: visualDirection,
+      mockup_screens: screens,
+      mockup_prototype_html: prototypeHtml,
+      mockup_figma_json: figmaJson,
+      mockup_canvas_hash: canvasHash,
+      mockup_pending_diff: false,
+    }).eq('id', personaId)
+
+    return {}
   } catch (error) {
-    console.error('UX Design Agent failed:', error)
-    await supabase.from('persona').update({ mockup_status: 'failed' }).eq('id', personaId)
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('[ux-design-agent] failed:', msg)
+    try {
+      await db.from('persona').update({ mockup_status: 'failed' }).eq('id', personaId)
+    } catch { /* ignore secondary failure */ }
+    return { error: msg }
   }
 }
 
+// ── JSON parsing ──────────────────────────────────────────────────────────────
+
 function parseJson(res: Anthropic.Message) {
   const raw = res.content[0].type === 'text' ? res.content[0].text : '{}'
-  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
-  return JSON.parse(cleaned)
+
+  // Try 1: already valid JSON
+  try { return JSON.parse(raw) } catch { /* fall through */ }
+
+  // Try 2: strip markdown fences
+  const fenced = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim()
+  try { return JSON.parse(fenced) } catch { /* fall through */ }
+
+  // Try 3: extract outermost { … } — handles any preamble Claude might add
+  const first = raw.indexOf('{')
+  const last = raw.lastIndexOf('}')
+  if (first !== -1 && last > first) {
+    try { return JSON.parse(raw.slice(first, last + 1)) } catch { /* fall through */ }
+  }
+
+  throw new Error(`JSON parse failed. Raw response: ${raw.slice(0, 300)}`)
 }
+
+// ── Prompt helpers ────────────────────────────────────────────────────────────
 
 function buildPersonaSummary(p: Persona): string {
   return `Name: ${p.name}, Role: ${p.role_title}\nGoals: ${p.macro_goals}\nPain points: ${p.pain_points}`
@@ -113,19 +135,17 @@ function buildCanvasSummary(nodes: FlowNode[], reqs: Requirement[]): string {
     .join('\n')
 }
 
-function buildPrototypeHtml(
-  screens: unknown[],
-  direction: unknown,
-  personaName: string
-): string {
+// ── Deterministic output builders ────────────────────────────────────────────
+
+function buildPrototypeHtml(screens: unknown[], direction: unknown, personaName: string): string {
   const typedScreens = screens as Record<string, unknown>[]
   const dir = direction as Record<string, unknown>
 
   const screenDivs = typedScreens.map((screen, i) => {
-    const components = (Array.isArray(screen.components)
+    const components = Array.isArray(screen.components)
       ? (screen.components as Record<string, unknown>[])
       : []
-    )
+
     const componentHtml = components.map((c) => {
       const label = String(c.label ?? c.type ?? 'Action')
       const type = String(c.type ?? 'button').toLowerCase()
@@ -138,14 +158,12 @@ function buildPrototypeHtml(
       if (type === 'list' || type === 'list_item') {
         return `<div class="rounded-xl border border-gray-100 bg-white px-4 py-3 text-sm text-gray-800 shadow-sm">${label}</div>`
       }
-      // Default: navigable button
       const nextIdx = i < typedScreens.length - 1 ? i + 1 : i
       return `<button onclick="showScreen(${nextIdx})" class="w-full rounded-full bg-[#1D1D1F] px-5 py-3 text-sm font-semibold text-white hover:bg-black transition-colors">${label}</button>`
     }).join('\n        ')
 
-    const isFirst = i === 0
     return `
-  <div id="screen-${i}" class="screen absolute inset-0 flex flex-col" style="display:${isFirst ? 'flex' : 'none'}">
+  <div id="screen-${i}" class="screen absolute inset-0 flex flex-col" style="display:${i === 0 ? 'flex' : 'none'}">
     <div class="flex items-center gap-3 border-b border-gray-100 bg-white px-5 py-4">
       ${i > 0 ? `<button onclick="showScreen(${i - 1})" class="text-gray-500 hover:text-gray-800 text-sm">← Back</button>` : '<div class="w-6"></div>'}
       <p class="flex-1 text-center text-sm font-semibold text-[#1D1D1F]">${String(screen.title ?? `Screen ${i + 1}`)}</p>
@@ -195,11 +213,7 @@ function buildPrototypeHtml(
 </html>`
 }
 
-function buildFigmaJson(
-  screens: unknown[],
-  direction: unknown,
-  personaName: string
-): Record<string, unknown> {
+function buildFigmaJson(screens: unknown[], direction: unknown, personaName: string): Record<string, unknown> {
   return {
     document: {
       id: 'root',
